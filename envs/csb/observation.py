@@ -82,17 +82,17 @@ class BoostAvailable(BaseFeature):
         raise NotImplemented('TODO vincent')
 
 
-class CompositeFeature:
+class CompositeFeature(BaseFeature):
     def to_representation(self):
-        reprensentation = []
+        representation = []
         for feature in self.features:
             r = feature.to_representation()
             if isinstance(r, list):
                 for sub_r in r:
-                    reprensentation.append(sub_r)
+                    representation.append(sub_r)
             else:
-                reprensentation.append(r)
-        return reprensentation
+                representation.append(r)
+        return representation
 
 
 class RelativeCoordinates(CompositeFeature):

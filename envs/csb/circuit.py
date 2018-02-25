@@ -2,6 +2,7 @@ import random
 from point import Point
 from checkpoint import Checkpoint
 
+
 CHECKPOINT_MAX_DEVIATION = 30
 
 BASE_CONFIGURATIONS = [
