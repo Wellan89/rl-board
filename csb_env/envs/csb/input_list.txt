@@ -1,0 +1,44 @@
+
+Liste des inputs pour CSB :
+
+Représentations des notions de base (à toi de remplir pour le coup..):
+- Distance : ??
+- Angle : ??
+- Speed : ?? (possiblement la même chose que 'Distance' ?)
+- Nombre de chekpoints parcourus : ??
+- Nombre total de chekpoints à parcourir dans la course: ??
+- Nombre de tours avant la disponibilité du shield : ??
+- Timeout (entre 1 et 100) : ??
+- Boost disponible : neurone 1/0 ?
+
+(expected : "Notion": "Low level representation")
+
+
+Notions intermédiaires :
+- Coordonnées relatives = Distance + Angle par rapport à l'ORIENTATION de la SOURCE
+- Vitesse relative = Angle par rapport à l'ORIENTATION de la SOURCE + Speed
+- Informations relatives = Coordonnées relatives de la target + Vitesse relative de la target (i.e : angle par rapport à la source)
+
+INPUTS DISPONIBLES :
+
+- Nombre total de checkpoins à parcourir dans la course
+
+- Pour chaque pod (ennemi et allié) :
+	- Vitesse relative du pod
+	- Boost disponible
+	- Timeout
+	- Nombre de tours avant la disponibilité du shield
+	- Nombre de checkpoints parcourus
+	- Informations relatives du pod allié
+	- Informations relatives du meilleur pod ennemi
+	- Informations relatives du 2è pod ennemi
+	- Coordonnées relatives du prochain checkpoint
+	- Coordonnées relatives du checkpoint suivant
+	- Coordonnées relatives du checkpoint suivant
+	- Coordonnées relatives du checkpoint suivant
+	- Coordonnées relatives du checkpoint suivant
+	- Coordonnées relatives du checkpoint suivant
+
+(
+note sur les coordonnées relatives des prochains checkpoints : les mêmes checkpoints peuvent apparaître plusieurs fois si le circuit ne comprend pas le nombre max de checkpoint
+)
