@@ -12,7 +12,7 @@ class Distance(BaseFeature):
         self.distance = distance
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.distance / 1000
 
 
 class Angle(BaseFeature):
@@ -21,7 +21,7 @@ class Angle(BaseFeature):
         self.angle = angle
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.angle / math.pi
 
 
 class Speed(BaseFeature):
@@ -30,7 +30,7 @@ class Speed(BaseFeature):
         self.speed = speed
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.speed / 1000
 
 
 class PassedCheckpoints(BaseFeature):
@@ -39,7 +39,7 @@ class PassedCheckpoints(BaseFeature):
         self.passed_checkpoints = passed_checkpoints
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.passed_checkpoints
 
 
 class TotalCheckpoints(BaseFeature):
@@ -48,7 +48,7 @@ class TotalCheckpoints(BaseFeature):
         self.total_checkpoints = total_checkpoints
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.total_checkpoints
 
 
 class ShieldTimer(BaseFeature):
@@ -59,7 +59,7 @@ class ShieldTimer(BaseFeature):
         self.shield_timer = shield_timer
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.shield_timer / 4
 
 
 class Timeout(BaseFeature):
@@ -70,7 +70,7 @@ class Timeout(BaseFeature):
         self.timeout = timeout
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return self.timeout / 100
 
 
 class BoostAvailable(BaseFeature):
@@ -79,7 +79,7 @@ class BoostAvailable(BaseFeature):
         self.boost_available = boost_available
 
     def to_representation(self):
-        raise NotImplemented('TODO vincent')
+        return float(self.boost_available)
 
 
 class CompositeFeature(BaseFeature):
@@ -140,9 +140,7 @@ class PodFeature(CompositeFeature):
 
 
 class Observation(CompositeFeature):
-
     def __init__(self, world):
-
         self.features = [
             TotalCheckpoints(world.circuit.nbcp() * world.nblaps),
             PodFeature(world, world.best_pod(0), world.second_pod(0), world.best_pod(1), world.second_pod(1)),
