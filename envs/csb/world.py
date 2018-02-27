@@ -1,10 +1,14 @@
+import random
+import math
 from envs.csb.collision import Collision
 from envs.csb.circuit import Circuit
+from envs.csb.pod import Pod
 
 
 class World:
 
     def __init__(self):
+        self.pods = [None, None, None, None]
         self.reset()
 
     def play(self, s1, s2):
@@ -62,8 +66,21 @@ class World:
     def reset(self):
         self.circuit = Circuit()
         self.turn = 0
-        self.pods = [None] * 4  # TODO : Pod placement (waiting for CG response) !!!!!
-        self.nblaps = 42  # TODO : Number of laps (Waiting for CG response) !!!!
+        distance_to_center = random.choice([500, 1500])
+        cp0x = self.circuit.cp(0).x
+        cp0y = self.circuit.cp(0).y
+        angle = math.pi / 2 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
+        self.pods[0] = Pod(1, cp0x + math.cos(angle) * distance_to_center,
+                           cp0y + math.sin(angle) * distance_to_center, self)
+        self.pods[1] = Pod(2, cp0x - math.cos(angle) * distance_to_center,
+                           cp0y - math.sin(angle) * distance_to_center, self)
+        self.pods[2] = Pod(3, cp0x + math.cos(angle) * (2000-distance_to_center),
+                           cp0y + math.sin(angle) * (2000-distance_to_center), self)
+        self.pods[3] = Pod(4, cp0x - math.cos(angle) * (2000-distance_to_center),
+                           cp0y - math.sin(angle) * (2000-distance_to_center), self)
+        for pod in self.pods:
+            pod.angle = angle
+        self.nblaps = 3
 
     def player_won(self, player):
         assert player == 0 or player == 1

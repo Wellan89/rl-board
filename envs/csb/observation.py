@@ -102,30 +102,38 @@ class RelativeCoordinates(CompositeFeature):
     def __init__(self, source, target):
         super().__init__(features=[
             Distance(source.distance(target)),
-            Angle(0),
+            Angle(source.getAngle(target) * math.pi / 180),
         ])
 
 
-class RelativeSpeed(CompositeFeature):
+class AbsoluteSpeed(CompositeFeature):
+    def __init__(self, pod):
+        super().__init__(features=[
+            Angle(math.atan2(pod.vy, pod.vx)),
+            Speed(math.sqrt(pod.vx**2 + pod.vy**2)),
+        ])
+
+
+class RelativeOrientation(CompositeFeature):
     def __init__(self, source, target):
         super().__init__(features=[
-            Angle(0),
-            Speed(math.sqrt(target.vx**2 + target.vy**2)),
+            Angle(source.diffAngle(target) * math.pi / 180),
         ])
 
 
 class RelativeInformation(CompositeFeature):
     def __init__(self, source, target):
         super().__init__(features=[
-            RelativeSpeed(source, target),
+            AbsoluteSpeed(target),
             RelativeCoordinates(source, target),
+            RelativeOrientation(source, target),
         ])
 
 
 class PodFeature(CompositeFeature):
     def __init__(self, world, pod, allied_pod, best_enemy_pod, second_enemy_pod):
         super().__init__(features=[
-            RelativeSpeed(pod, pod),
+            AbsoluteSpeed(pod),
             BoostAvailable(pod.boost_available),
             Timeout(pod.timeout),
             ShieldTimer(pod.shield),
