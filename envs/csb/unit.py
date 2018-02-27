@@ -1,5 +1,5 @@
-from point import Point
-from collision import Collision
+from envs.csb.point import Point
+from envs.csb.collision import Collision
 import math
 
 

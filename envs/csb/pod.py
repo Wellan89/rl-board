@@ -1,5 +1,5 @@
-from unit import Unit
-from util import LIN, MAX_THRUST
+from envs.csb.unit import Unit
+from envs.csb.util import LIN, MAX_THRUST
 import math
 
 

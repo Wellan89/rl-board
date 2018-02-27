@@ -1,18 +1,24 @@
 import gym
-from world import World
-from solution import Solution
-from move import Move
-from observation import Observation
+import numpy as np
+
+from envs.csb.world import World
+from envs.csb.solution import Solution
+from envs.csb.move import Move
+from envs.csb.observation import Observation
 
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human']}
+    reward_range = (-100.0, 100.0)
+    spec = None
+
+    action_space = gym.spaces.Box(low=0.0, high=1.0, shape=(6,), dtype=np.float32)
+    observation_space = gym.spaces.Box(shape=(len(Observation(World()).to_representation()),), dtype=np.float32)
 
     def __init__(self):
         self.world = World()
 
-    def _step(self, action):
-
+    def step(self, action):
         self._check_action_format(action)
 
         current_passed_cp = self.world.best_pod(0).nbChecked()
@@ -56,7 +62,7 @@ class CsbEnv(gym.Env):
             reward = now_passed_cp - current_passed_cp
             episode_over = False
 
-        return Observation(self.world), reward, episode_over, self._get_debug()
+        return Observation(self.world), reward, episode_over, self.get_debug()
 
     def _check_action_format(self, action):
         assert len(action) == 2
@@ -65,13 +71,11 @@ class CsbEnv(gym.Env):
             for gene in pod_action:
                 assert 0 <= gene <= 1
 
-    def _reset(self):
+    def reset(self):
         self.world.reset()
 
-    def _render(self, mode='human', close=False):
+    def render(self, mode='human', close=False):
         pass
 
-    def _get_debug(self):
-        return {
-            '42': 42
-        }
+    def get_debug(self):
+        return {}

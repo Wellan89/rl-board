@@ -1,6 +1,6 @@
 import random
-from point import Point
-from checkpoint import Checkpoint
+from envs.csb.point import Point
+from envs.csb.checkpoint import Checkpoint
 
 
 CHECKPOINT_MAX_DEVIATION = 30

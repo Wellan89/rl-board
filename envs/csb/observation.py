@@ -83,6 +83,9 @@ class BoostAvailable(BaseFeature):
 
 
 class CompositeFeature(BaseFeature):
+    def __init__(self, features):
+        self.features = features
+
     def to_representation(self):
         representation = []
         for feature in self.features:
@@ -97,31 +100,31 @@ class CompositeFeature(BaseFeature):
 
 class RelativeCoordinates(CompositeFeature):
     def __init__(self, source, target):
-        self.features = [
+        super().__init__(features=[
             Distance(source.distance(target)),
             Angle(0),
-        ]
+        ])
 
 
 class RelativeSpeed(CompositeFeature):
     def __init__(self, source, target):
-        self.features = [
+        super().__init__(features=[
             Angle(0),
             Speed(math.sqrt(target.vx**2 + target.vy**2)),
-        ]
+        ])
 
 
 class RelativeInformation(CompositeFeature):
     def __init__(self, source, target):
-        self.features = [
+        super().__init__(features=[
             RelativeSpeed(source, target),
             RelativeCoordinates(source, target),
-        ]
+        ])
 
 
 class PodFeature(CompositeFeature):
     def __init__(self, world, pod, allied_pod, best_enemy_pod, second_enemy_pod):
-        self.features = [
+        super().__init__(features=[
             RelativeSpeed(pod, pod),
             BoostAvailable(pod.boost_available),
             Timeout(pod.timeout),
@@ -136,15 +139,15 @@ class PodFeature(CompositeFeature):
             RelativeCoordinates(pod, pod.next_checkpoint(world, 3)),
             RelativeCoordinates(pod, pod.next_checkpoint(world, 4)),
             RelativeCoordinates(pod, pod.next_checkpoint(world, 5)),
-        ]
+        ])
 
 
 class Observation(CompositeFeature):
     def __init__(self, world):
-        self.features = [
+        super().__init__(features=[
             TotalCheckpoints(world.circuit.nbcp() * world.nblaps),
             PodFeature(world, world.best_pod(0), world.second_pod(0), world.best_pod(1), world.second_pod(1)),
             PodFeature(world, world.second_pod(0), world.best_pod(0), world.best_pod(1), world.second_pod(1)),
             PodFeature(world, world.best_pod(1), world.second_pod(1), world.best_pod(0), world.second_pod(0)),
             PodFeature(world, world.second_pod(1), world.best_pod(1), world.best_pod(0), world.second_pod(0)),
-        ]
+        ])
