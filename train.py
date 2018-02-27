@@ -33,7 +33,11 @@ from tensorforce.execution import Runner
 from tensorforce.contrib.openai_gym import OpenAIGym
 
 
-# python train.py CartPole-v1 -a agents/ppo-v0.json -n networks/mlp-v0.json -e 2000 -m 200
+# python train.py CartPole-v1 -a agents/ppo-v1.json -n networks/mlp-v1.json
+
+
+def _basename_no_ext(filename):
+    return os.path.splitext(os.path.basename(filename))[0]
 
 
 def main():
@@ -49,7 +53,7 @@ def main():
     parser.add_argument('-l', '--load', help="Load agent from this dir")
     parser.add_argument('--monitor', help="Save results to this directory")
     parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
-    parser.add_argument('--monitor-video', type=int, default=0, help="Save video every x steps (0 = disabled)")
+    parser.add_argument('--monitor-video', type=int, default=500, help="Save video every x steps (0 = disabled)")
     parser.add_argument('-D', '--debug', action='store_true', default=False, help="Show debug outputs")
 
     args = parser.parse_args()
@@ -58,13 +62,6 @@ def main():
 
     logger = logging.getLogger(__file__)
     logger.setLevel(logging.INFO)
-
-    environment = OpenAIGym(
-        gym_id=args.gym_id,
-        monitor=args.monitor,
-        monitor_safe=args.monitor_safe,
-        monitor_video=args.monitor_video
-    )
 
     if args.agent is not None:
         with open(args.agent, 'r') as fp:
@@ -79,12 +76,26 @@ def main():
         network = None
         logger.info("No network configuration provided.")
 
+    if not args.monitor:
+        args.monitor = '{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.agent), _basename_no_ext(args.network))
+
+    environment = OpenAIGym(
+        gym_id=args.gym_id,
+        monitor='logs/{}/gym'.format(args.monitor),
+        monitor_safe=args.monitor_safe,
+        monitor_video=args.monitor_video
+    )
+
     agent = Agent.from_spec(
         spec=agent,
         kwargs=dict(
             states=environment.states,
             actions=environment.actions,
-            network=network
+            network=network,
+            saver=dict(directory='logs/{}/checkpoints'.format(args.monitor), seconds=600),
+            summarizer=dict(directory='logs/{}/summaries'.format(args.monitor),
+                            labels=['gradients'],
+                            seconds=120)
         )
     )
     if args.load:
@@ -104,7 +115,7 @@ def main():
         repeat_actions=1
     )
 
-    if args.debug:  # TODO: Timestep-based reporting
+    if args.debug:
         report_episodes = 1
     else:
         report_episodes = 100

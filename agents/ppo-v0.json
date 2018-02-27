@@ -22,15 +22,5 @@
     "discount": 0.99,
     "entropy_regularization": 0.01,
     "gae_lambda": null,
-    "likelihood_ratio_clipping": 0.2,
-
-    "saver": {
-        "directory": null,
-        "seconds": 600
-    },
-    "summarizer": {
-        "directory": null,
-        "labels": [],
-        "seconds": 120
-    }
+    "likelihood_ratio_clipping": 0.2
 }
