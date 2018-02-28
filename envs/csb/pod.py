@@ -35,7 +35,7 @@ class Pod(Unit):
         return self.lap * self.world.circuit.nbcp() + lastCP
 
     def score(self):
-        return self.nbChecked() * 50000 - self.distance(self.world.circuit.cp(self.ncpid))
+        return self.nbChecked(), -self.distance(self.world.circuit.cp(self.ncpid))
 
     def getAngle(self, p):
         d = self.distance(p)

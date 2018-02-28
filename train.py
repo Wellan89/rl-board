@@ -61,7 +61,6 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-
     logger = logging.getLogger(__file__)
     logger.setLevel(logging.INFO)
 
@@ -96,7 +95,7 @@ def main():
             network=network,
             saver=dict(directory='logs/{}/checkpoints'.format(args.monitor), seconds=600),
             summarizer=dict(directory='logs/{}/summaries'.format(args.monitor),
-                            labels=['gradients'],
+                            labels=[],
                             seconds=120)
         )
     )

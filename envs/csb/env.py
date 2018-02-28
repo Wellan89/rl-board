@@ -1,14 +1,18 @@
 import gym
 import numpy as np
+from gym.envs.classic_control import rendering
 
 from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
 from envs.csb.observation import Observation
 
+VIEWPORT_W = 600
+VIEWPORT_H = 400
+
 
 class CsbEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
+    metadata = {'render.modes': ['human', 'rgb_array']}
     reward_range = (-10.0, 10.0)
     spec = None
 
@@ -18,6 +22,7 @@ class CsbEnv(gym.Env):
 
     def __init__(self):
         self.world = World()
+        self.viewer = None
 
     def _get_state(self):
         return Observation(self.world).to_representation()
@@ -72,5 +77,21 @@ class CsbEnv(gym.Env):
         self.world.reset()
         return self._get_state()
 
-    def render(self, mode='human', close=False):
-        pass
+    def render(self, mode='human'):
+        if self.viewer is None:
+            self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
+
+        def _pos_to_screen(_p):
+            return _p.x * VIEWPORT_W / 15000, _p.y * VIEWPORT_H / 10000
+
+        for i, pod in enumerate(self.world.pods):
+            self.viewer.draw_circle(color=(int(i >= 2), int(i < 2), 0)).add_attr(
+                rendering.Transform(translation=_pos_to_screen(pod))
+            )
+
+        for cp in self.world.circuit.cps:
+            self.viewer.draw_circle(color=(0, 0, 1)).add_attr(
+                rendering.Transform(translation=_pos_to_screen(cp))
+            )
+
+        return self.viewer.render(return_rgb_array=(mode == 'rgb_array'))
