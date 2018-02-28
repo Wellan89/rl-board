@@ -1,5 +1,7 @@
 import math
 
+from envs.csb import util
+
 
 class BaseFeature:
     def to_representation(self):
@@ -17,6 +19,7 @@ class Distance(BaseFeature):
 
 class Angle(BaseFeature):
     def __init__(self, angle):
+        angle = util.correct_angle_rad(angle)
         assert -math.pi <= angle <= math.pi
         self.angle = angle
 

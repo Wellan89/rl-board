@@ -35,7 +35,7 @@ from tensorforce.contrib.openai_gym import OpenAIGym
 import envs
 
 
-# python train.py csb-v0 -a agents/ppo-v1.json -n networks/mlp-v1.json
+# python train.py csb-v0 -a agents/trpo-v0.json -n networks/mlp-v1.json
 
 
 def _basename_no_ext(filename):
