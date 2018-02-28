@@ -79,7 +79,7 @@ class World:
         self.pods[3] = Pod(4, cp0x - math.cos(angle) * (2000-distance_to_center),
                            cp0y - math.sin(angle) * (2000-distance_to_center), self)
         for pod in self.pods:
-            pod.angle = angle
+            pod.angle = angle - math.pi / 2
         self.nblaps = 3
 
     def player_won(self, player):
@@ -90,7 +90,8 @@ class World:
             return True
 
         # Opponent timeout
-        return self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0
+        return False
+        # return self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0
 
     def best_pod(self, player):
         if self.pods[player*2].score() > self.pods[player*2+1].score():
