@@ -119,7 +119,7 @@ def main():
     if args.debug:
         report_episodes = 1
     else:
-        report_episodes = 100
+        report_episodes = 10
 
     logger.info("Starting {agent} for Environment '{env}'".format(agent=agent, env=environment))
 
@@ -130,6 +130,7 @@ def main():
                 r.agent.episode, r.episode_timestep, steps_per_second
             ))
             logger.info("Episode reward: {}".format(r.episode_rewards[-1]))
+            logger.info("Max of last 500 rewards: {:0.2f}".format(max(r.episode_rewards[-500:])))
             logger.info("Average of last 500 rewards: {:0.2f}".format(sum(r.episode_rewards[-500:]) / min(500, len(r.episode_rewards))))
             logger.info("Average of last 100 rewards: {:0.2f}".format(sum(r.episode_rewards[-100:]) / min(100, len(r.episode_rewards))))
         return True

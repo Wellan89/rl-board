@@ -28,7 +28,7 @@ class Angle(BaseFeature):
 
 class Speed(BaseFeature):
     def __init__(self, speed):
-        assert speed >= 0
+        # assert speed >= 0
         self.speed = speed
 
     def to_representation(self):
