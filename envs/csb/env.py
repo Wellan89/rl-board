@@ -82,15 +82,15 @@ class CsbEnv(gym.Env):
             self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
 
         def _pos_to_screen(_p):
-            return _p.x * VIEWPORT_W / 15000, _p.y * VIEWPORT_H / 10000
+            return _p.x * VIEWPORT_W / 16000, _p.y * VIEWPORT_H / 9000
 
         for i, pod in enumerate(self.world.pods):
             self.viewer.draw_circle(color=(int(i >= 2), int(i < 2), 0)).add_attr(
                 rendering.Transform(translation=_pos_to_screen(pod))
             )
 
-        for cp in self.world.circuit.cps:
-            self.viewer.draw_circle(color=(0, 0, 1)).add_attr(
+        for i, cp in enumerate(self.world.circuit.cps):
+            self.viewer.draw_circle(color=(0, 0, 1), radius=10+3*(i+1)).add_attr(
                 rendering.Transform(translation=_pos_to_screen(cp))
             )
 

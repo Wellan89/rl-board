@@ -90,7 +90,7 @@ class World:
             return True
 
         # Opponent timeout
-        return self.pods[(1-player)*2].timeout < 0 or self.pods[(1-player)*2+1].timeout < 0
+        return self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0
 
     def best_pod(self, player):
         if self.pods[player*2].score() > self.pods[player*2+1].score():
