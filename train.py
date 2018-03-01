@@ -60,6 +60,9 @@ def main():
 
     args = parser.parse_args()
 
+    if not args.monitor:
+        args.monitor = '{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.agent), _basename_no_ext(args.network))
+
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__file__)
     logger.setLevel(logging.INFO)
@@ -76,9 +79,6 @@ def main():
     else:
         network = None
         logger.info("No network configuration provided.")
-
-    if not args.monitor:
-        args.monitor = '{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.agent), _basename_no_ext(args.network))
 
     environment = OpenAIGym(
         gym_id=args.gym_id,

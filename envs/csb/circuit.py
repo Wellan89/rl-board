@@ -27,11 +27,11 @@ class Circuit:
     def __init__(self):
         self.cps = [
             Checkpoint(
-                -1,  # id : whatever
+                i,
                 point.x + random.randint(-CHECKPOINT_MAX_DEVIATION, CHECKPOINT_MAX_DEVIATION),
                 point.y + random.randint(-CHECKPOINT_MAX_DEVIATION, CHECKPOINT_MAX_DEVIATION),
             )
-            for point in random.choice(BASE_CONFIGURATIONS)
+            for i, point in enumerate(random.choice(BASE_CONFIGURATIONS))
         ]
 
     def nbcp(self):

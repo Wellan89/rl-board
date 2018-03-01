@@ -19,11 +19,18 @@ class Distance(BaseFeature):
 
 class Angle(BaseFeature):
     def __init__(self, angle):
-        angle = util.correct_angle_rad(angle)
         self.angle = angle
 
     def to_representation(self):
-        return self.angle / math.pi
+        return self.angle / 360.0
+
+
+class Pos(BaseFeature):
+    def __init__(self, pos):
+        self.pos = pos
+
+    def to_representation(self):
+        return self.pos / 1000
 
 
 class Speed(BaseFeature):
@@ -104,7 +111,7 @@ class RelativeCoordinates(CompositeFeature):
     def __init__(self, source, target):
         super().__init__(features=[
             Distance(source.distance(target)),
-            Angle(source.getAngle(target) * math.pi / 180),
+            Angle(source.getAngle(target)),
         ])
 
 
@@ -119,7 +126,7 @@ class AbsoluteSpeed(CompositeFeature):
 class RelativeOrientation(CompositeFeature):
     def __init__(self, source, target):
         super().__init__(features=[
-            Angle(source.diffAngle(target) * math.pi / 180),
+            Angle(source.diffAngle(target)),
         ])
 
 
@@ -136,7 +143,7 @@ class PodFeature(CompositeFeature):
     def __init__(self, world, pod, allied_pod, best_enemy_pod, second_enemy_pod):
         super().__init__(features=[
             AbsoluteSpeed(pod),
-            Angle(pod.angle * math.pi / 180),
+            Angle(pod.angle),
             # BoostAvailable(pod.boost_available),
             # Timeout(pod.timeout),
             # ShieldTimer(pod.shield),
@@ -155,23 +162,23 @@ class PodFeature(CompositeFeature):
 
 class Observation(CompositeFeature):
     def __init__(self, world):
-        # super().__init__(features=[
-        #     # TotalCheckpoints(world.circuit.nbcp() * world.nblaps),
-        #     PodFeature(world, world.best_pod(0), world.second_pod(0), world.best_pod(1), world.second_pod(1)),
-        #     PodFeature(world, world.second_pod(0), world.best_pod(0), world.best_pod(1), world.second_pod(1)),
-        #     # PodFeature(world, world.best_pod(1), world.second_pod(1), world.best_pod(0), world.second_pod(0)),
-        #     # PodFeature(world, world.second_pod(1), world.best_pod(1), world.best_pod(0), world.second_pod(0)),
-        # ])
-        super().__init__(features=[
-            Speed(world.pods[0].vx),
-            Speed(world.pods[0].vy),
-            Angle(world.pods[0].angle * math.pi / 180),
-            Speed(world.pods[0].next_checkpoint(world, 0).x - world.pods[0].x),
-            Speed(world.pods[0].next_checkpoint(world, 0).y - world.pods[0].y)
-            # Speed(world.pods[0].vy)
-            # TotalCheckpoints(world.circuit.nbcp() * world.nblaps),
-            # PodFeature(world, world.best_pod(0), world.second_pod(0), world.best_pod(1), world.second_pod(1)),
-            # PodFeature(world, world.second_pod(0), world.best_pod(0), world.best_pod(1), world.second_pod(1)),
-            # PodFeature(world, world.best_pod(1), world.second_pod(1), world.best_pod(0), world.second_pod(0)),
-            # PodFeature(world, world.second_pod(1), world.best_pod(1), world.best_pod(0), world.second_pod(0)),
-        ])
+        features = [TotalCheckpoints(world.circuit.nbcp() * world.nblaps)]
+        for pod in world.pods:
+            features += [
+                Pos(pod.x),
+                Pos(pod.y),
+                Speed(pod.vx),
+                Speed(pod.vy),
+                Angle(pod.angle),
+                BoostAvailable(pod.boost_available),
+                Timeout(pod.timeout),
+                ShieldTimer(pod.shield),
+                PassedCheckpoints(pod.nbChecked()),
+            ]
+            for i in range(5):
+                next_cp = pod.next_checkpoint(world, i)
+                features += [
+                    Speed(next_cp.x - pod.x),
+                    Speed(next_cp.y - pod.y),
+                ]
+        super().__init__(features=features)

@@ -46,6 +46,12 @@ from tensorforce.agents import Agent
 from tensorforce.execution import Runner
 from tensorforce.contrib.openai_gym import OpenAIGym
 
+import envs
+
+
+def _basename_no_ext(filename):
+    return os.path.splitext(os.path.basename(filename))[0]
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -65,8 +71,14 @@ def main():
     parser.add_argument('-K', '--kill', action='store_true', help="Kill runners")
     parser.add_argument('-L', '--logdir', default='logs_async', help="Log directory")
     parser.add_argument('-D', '--debug', action='store_true', help="Show debug outputs")
+    parser.add_argument('--monitor', help="Save results to this directory")
+    parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
+    parser.add_argument('--monitor-video', type=int, default=500, help="Save video every x steps (0 = disabled)")
 
     args = parser.parse_args()
+
+    if not args.monitor:
+        args.monitor = '{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.agent), _basename_no_ext(args.network))
 
     session_name = 'OpenAI-' + args.gym_id
     shell = '/bin/bash'
@@ -156,7 +168,13 @@ def main():
     cluster = {'ps': ps_hosts, 'worker': worker_hosts}
     cluster_spec = tf.train.ClusterSpec(cluster)
 
-    environment = OpenAIGym(args.gym_id)
+    do_monitor = True  # (args.task_index == 0)
+    environment = OpenAIGym(
+        gym_id=args.gym_id,
+        monitor='logs/{}/gym'.format(args.monitor) if do_monitor and args.monitor else None,
+        monitor_safe=args.monitor_safe if do_monitor else None,
+        monitor_video=args.monitor_video // args.num_workers if do_monitor and args.monitor_video else None
+    )
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)

@@ -34,7 +34,7 @@ class CsbEnv(gym.Env):
     def step(self, action):
         assert len(action) == 6 and all(0.0 <= v <= 1.0 for v in action)
 
-        current_pod_scores = [pod.score() for pod in self.world.pods[:2]]
+        current_score = self.world.best_pod(0).score()
         current_passed_cp = self.world.best_pod(0).nbChecked()
 
         self.world.play(
@@ -65,8 +65,8 @@ class CsbEnv(gym.Env):
         )
 
         if self.difficulty_level == 0:
-            reward = max(pod.score() - current_pod_score
-                         for pod, current_pod_score in zip(self.world.pods[:2], current_pod_scores))
+            now_score = self.world.best_pod(0).score()
+            reward = now_score - current_score
             episode_over = (self.world.turn >= 400)
         elif self.difficulty_level == 1:
             if self.world.player_won(1):
@@ -97,16 +97,18 @@ class CsbEnv(gym.Env):
         def _pos_to_screen(_p):
             return _p.x * VIEWPORT_W / 16000, _p.y * VIEWPORT_H / 9000
 
-        for i, pod in enumerate(self.world.pods):
+        for cp in self.world.circuit.cps:
             # TODO: Real radius
-            self.viewer.draw_circle(color=(int(i >= 2), int(i < 2), 0)).add_attr(
-                rendering.Transform(translation=_pos_to_screen(pod))
+            color_ratio = cp.id / (len(self.world.circuit.cps) - 1)
+            color = (color_ratio * 0.8, color_ratio * 0.8, 0.2 + color_ratio * 0.8)
+            self.viewer.draw_circle(color=color, radius=20).add_attr(
+                rendering.Transform(translation=_pos_to_screen(cp))
             )
 
-        for i, cp in enumerate(self.world.circuit.cps):
-            # TODO: Real radius + number indicating the checkpoint order
-            self.viewer.draw_circle(color=(0, 0, 1), radius=10+3*(i+1)).add_attr(
-                rendering.Transform(translation=_pos_to_screen(cp))
+        for i, pod in enumerate(self.world.pods):
+            # TODO: Real radius
+            self.viewer.draw_circle(color=(int(i >= 2), int(i < 2), 0), radius=10).add_attr(
+                rendering.Transform(translation=_pos_to_screen(pod))
             )
 
         return self.viewer.render(return_rgb_array=(mode == 'rgb_array'))
