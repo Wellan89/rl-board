@@ -13,23 +13,28 @@ VIEWPORT_H = 400
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
-    reward_range = (-100.0, 100.0)
+    reward_range = (-10.0, 10.0)
     spec = None
 
     action_space = gym.spaces.Box(low=0.0, high=1.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Box(low=-100.0, high=100.0,
                                        shape=(len(Observation(World()).to_representation()),), dtype=np.float32)
 
+    difficulty_level = None
+
     def __init__(self):
         self.world = World()
         self.viewer = None
 
     def _get_state(self):
-        return Observation(self.world).to_representation()
+        state = Observation(self.world).to_representation()
+        # assert(all(-100.0 <= v <= 100.0 for v in state))
+        return state
 
     def step(self, action):
-        assert len(action) == 6 and all(0 <= v <= 1 for v in action)
+        assert len(action) == 6 and all(0.0 <= v <= 1.0 for v in action)
 
+        current_pod_scores = [pod.score() for pod in self.world.pods[:2]]
         current_passed_cp = self.world.best_pod(0).nbChecked()
 
         self.world.play(
@@ -59,18 +64,26 @@ class CsbEnv(gym.Env):
             )
         )
 
-        if self.world.player_won(1):
-            episode_over = True
-            reward = -100.0
-        elif self.world.player_won(0):
-            episode_over = True
-            reward = 100.0
+        if self.difficulty_level == 0:
+            reward = max(pod.score() - current_pod_score
+                         for pod, current_pod_score in zip(self.world.pods[:2], current_pod_scores))
+            episode_over = (self.world.turn >= 400)
+        elif self.difficulty_level == 1:
+            if self.world.player_won(1):
+                episode_over = True
+                reward = -10.0
+            elif self.world.player_won(0):
+                episode_over = True
+                reward = 10.0
+            else:
+                now_passed_cp = max(map(lambda pod: pod.nbChecked(), self.world.pods[:2]))
+                assert now_passed_cp >= current_passed_cp
+                reward = (now_passed_cp - current_passed_cp) * 0.1
+                episode_over = False
         else:
-            now_passed_cp = self.world.best_pod(0).nbChecked()
-            assert now_passed_cp >= current_passed_cp
-            reward = (now_passed_cp - current_passed_cp) * 1.0
-            episode_over = False
+            raise ValueError('Unknown difficulty level: {}'.format(self.difficulty_level))
 
+        # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, None
 
     def reset(self):
@@ -85,13 +98,23 @@ class CsbEnv(gym.Env):
             return _p.x * VIEWPORT_W / 16000, _p.y * VIEWPORT_H / 9000
 
         for i, pod in enumerate(self.world.pods):
+            # TODO: Real radius
             self.viewer.draw_circle(color=(int(i >= 2), int(i < 2), 0)).add_attr(
                 rendering.Transform(translation=_pos_to_screen(pod))
             )
 
         for i, cp in enumerate(self.world.circuit.cps):
+            # TODO: Real radius + number indicating the checkpoint order
             self.viewer.draw_circle(color=(0, 0, 1), radius=10+3*(i+1)).add_attr(
                 rendering.Transform(translation=_pos_to_screen(cp))
             )
 
         return self.viewer.render(return_rgb_array=(mode == 'rgb_array'))
+
+
+class CsbEnvV0D0(CsbEnv):
+    difficulty_level = 0
+
+
+class CsbEnvV0D1(CsbEnv):
+    difficulty_level = 1

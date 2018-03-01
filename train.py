@@ -35,7 +35,7 @@ from tensorforce.contrib.openai_gym import OpenAIGym
 import envs
 
 
-# python train.py csb-v0 -a agents/trpo-v0.json -n networks/mlp-v1.json
+# python train.py csb-d0-v0 -a agents/trpo-v0.json -n networks/mlp-v1.json
 
 
 def _basename_no_ext(filename):
@@ -130,6 +130,7 @@ def main():
                 r.agent.episode, r.episode_timestep, steps_per_second
             ))
             logger.info("Episode reward: {}".format(r.episode_rewards[-1]))
+            logger.info("All time best: {:0.2f}".format(max(r.episode_rewards)))
             logger.info("Average of last 500 rewards: {:0.2f}".format(sum(r.episode_rewards[-500:]) / min(500, len(r.episode_rewards))))
             logger.info("Average of last 100 rewards: {:0.2f}".format(sum(r.episode_rewards[-100:]) / min(100, len(r.episode_rewards))))
         return True
