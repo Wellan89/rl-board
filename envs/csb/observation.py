@@ -67,13 +67,13 @@ class ShieldTimer(BaseFeature):
 
 class Timeout(BaseFeature):
     def __init__(self, timeout):
-        assert timeout <= 100
+        assert timeout <= util.TIMEOUT
         if timeout < 0:
             timeout = 0
         self.timeout = timeout
 
     def to_representation(self):
-        return self.timeout / 100
+        return self.timeout / util.TIMEOUT
 
 
 class BoostAvailable(BaseFeature):

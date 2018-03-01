@@ -1,4 +1,5 @@
 from envs.csb.unit import Unit
+from envs.csb.util import TIMEOUT
 
 
 class Checkpoint(Unit):
@@ -8,4 +9,4 @@ class Checkpoint(Unit):
 
     def bounce(self, pod):
         pod.incrcpid()
-        pod.timeout = 100
+        pod.timeout = TIMEOUT

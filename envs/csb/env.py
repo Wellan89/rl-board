@@ -13,7 +13,7 @@ VIEWPORT_H = 400
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
-    reward_range = (-10.0, 10.0)
+    reward_range = (-100.0, 100.0)
     spec = None
 
     action_space = gym.spaces.Box(low=0.0, high=1.0, shape=(6,), dtype=np.float32)
@@ -61,14 +61,14 @@ class CsbEnv(gym.Env):
 
         if self.world.player_won(1):
             episode_over = True
-            reward = -10.0
+            reward = -100.0
         elif self.world.player_won(0):
             episode_over = True
-            reward = 10.0
+            reward = 100.0
         else:
             now_passed_cp = self.world.best_pod(0).nbChecked()
             assert now_passed_cp >= current_passed_cp
-            reward = (now_passed_cp - current_passed_cp) * 0.1
+            reward = (now_passed_cp - current_passed_cp) * 1.0
             episode_over = False
 
         return self._get_state(), reward, episode_over, None

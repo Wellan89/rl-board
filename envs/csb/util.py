@@ -15,3 +15,4 @@ def correct_angle_rad(angle):
 
 MAX_THRUST = 200
 NBPOD = 4
+TIMEOUT = 100

@@ -1,6 +1,7 @@
-from envs.csb.unit import Unit
-from envs.csb.util import LIN, MAX_THRUST
 import math
+
+from envs.csb.unit import Unit
+from envs.csb.util import LIN, MAX_THRUST, TIMEOUT
 
 
 class Pod(Unit):
@@ -9,7 +10,7 @@ class Pod(Unit):
         super().__init__(id, x, y, 400, 0, 0)
         self.angle = 0
         self.ncpid = 1
-        self.timeout = 100
+        self.timeout = TIMEOUT
         self.shield = 0
         self.lap = 0
         self.world = world
