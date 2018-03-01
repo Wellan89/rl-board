@@ -163,12 +163,11 @@ class Observation(CompositeFeature):
         #     # PodFeature(world, world.second_pod(1), world.best_pod(1), world.best_pod(0), world.second_pod(0)),
         # ])
         super().__init__(features=[
-            Speed(world.pods[0].x),
-            Speed(world.pods[0].y),
             Speed(world.pods[0].vx),
             Speed(world.pods[0].vy),
-            Speed(world.pods[0].next_checkpoint(world, 0).x),
-            Speed(world.pods[0].next_checkpoint(world, 0).y)
+            Angle(world.pods[0].angle * math.pi / 180),
+            Speed(world.pods[0].next_checkpoint(world, 0).x - world.pods[0].x),
+            Speed(world.pods[0].next_checkpoint(world, 0).y - world.pods[0].y)
             # Speed(world.pods[0].vy)
             # TotalCheckpoints(world.circuit.nbcp() * world.nblaps),
             # PodFeature(world, world.best_pod(0), world.second_pod(0), world.best_pod(1), world.second_pod(1)),
