@@ -40,6 +40,7 @@ class Pod(Unit):
         next_cp = self.world.circuit.cp((self.ncpid - 1) % self.world.circuit.nbcp())
         distance_cp_to_ncp = current_cp.distance(next_cp)
         cp_dist_score = (distance_cp_to_ncp - self.distance(self.world.circuit.cp(self.ncpid))) / distance_cp_to_ncp
+        #return self.nbChecked() + max(min(cp_dist_score, 1.0), 0.0)#to test
         return self.nbChecked() + cp_dist_score
 
     def getAngle(self, p):

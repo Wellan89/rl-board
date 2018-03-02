@@ -21,6 +21,8 @@ BASE_CONFIGURATIONS = [
     [Point(10323, 3366), Point(11203, 5425), Point(7259, 6656), Point(5425, 2838)],
 ]
 
+MAX_NB_CHECKPOINTS = max(map(len, BASE_CONFIGURATIONS))
+
 
 class Circuit:
 

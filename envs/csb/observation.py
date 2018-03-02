@@ -1,5 +1,6 @@
 import math
 
+from envs.csb import circuit
 from envs.csb import util
 
 
@@ -166,10 +167,17 @@ class Observation(CompositeFeature):
                 ShieldTimer(pod.shield),
                 PassedCheckpoints(pod.nbChecked()),
             ]
-            for i in range(5):
-                next_cp = pod.next_checkpoint(world, i)
+        for i in range(circuit.MAX_NB_CHECKPOINTS):
+            if i < world.circuit.nbcp():
+                cp = world.circuit.cp(i)
                 features += [
-                    Pos(next_cp.x - pod.x),
-                    Pos(next_cp.y - pod.y),
+                    Pos(cp.x),
+                    Pos(cp.y),
                 ]
+            else:
+                features += [
+                    Pos(0.0),
+                    Pos(0.0),
+                ]
+
         super().__init__(features=features)
