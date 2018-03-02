@@ -173,7 +173,7 @@ def main():
         gym_id=args.gym_id,
         monitor='logs/{}/gym'.format(args.monitor) if do_monitor and args.monitor else None,
         monitor_safe=args.monitor_safe if do_monitor else None,
-        monitor_video=args.monitor_video // args.num_workers if do_monitor and args.monitor_video else None
+        monitor_video=args.monitor_video if do_monitor and args.monitor_video else None
     )
 
     logging.basicConfig(level=logging.INFO)
@@ -236,14 +236,15 @@ def main():
     def episode_finished(r):
         if r.episode % report_episodes == 0:
             steps_per_second = r.timestep / (time.time() - r.start_time)
-            logger.info("Finished episode {} after overall {} timesteps. Steps Per Second {}".format(
+            logger.info("Finished episode {:d} after overall {:d} timesteps. Steps Per Second {:.2f}".format(
                 r.agent.episode,
                 r.agent.timestep,
                 steps_per_second)
             )
-            logger.info("Episode reward: {}".format(r.episode_rewards[-1]))
-            logger.info("Average of last 500 rewards: {}".format(sum(r.episode_rewards[-500:]) / min(500, len(r.episode_rewards))))
-            logger.info("Average of last 100 rewards: {}".format(sum(r.episode_rewards[-100:]) / min(100, len(r.episode_rewards))))
+            logger.info("Latest episode rewards: {}".format(', '.join(map('{:.2f}'.format, r.episode_rewards[-5:]))))
+            logger.info("All time best: {:0.2f}".format(max(r.episode_rewards)))
+            logger.info("Average of last 500 rewards: {:.2f}".format(sum(r.episode_rewards[-500:]) / min(500, len(r.episode_rewards))))
+            logger.info("Average of last 100 rewards: {:.2f}".format(sum(r.episode_rewards[-100:]) / min(100, len(r.episode_rewards))))
         return True
 
     runner.run(

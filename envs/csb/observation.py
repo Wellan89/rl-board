@@ -33,15 +33,6 @@ class Pos(BaseFeature):
         return self.pos / 1000
 
 
-class Speed(BaseFeature):
-    def __init__(self, speed):
-        # assert speed >= 0
-        self.speed = speed
-
-    def to_representation(self):
-        return self.speed / 1000
-
-
 class PassedCheckpoints(BaseFeature):
     def __init__(self, passed_checkpoints):
         assert passed_checkpoints >= 0
@@ -119,7 +110,7 @@ class AbsoluteSpeed(CompositeFeature):
     def __init__(self, pod):
         super().__init__(features=[
             Angle(math.atan2(pod.vy, pod.vx)),
-            Speed(math.sqrt(pod.vx**2 + pod.vy**2)),
+            Pos(math.sqrt(pod.vx**2 + pod.vy**2)),
         ])
 
 
@@ -167,8 +158,8 @@ class Observation(CompositeFeature):
             features += [
                 Pos(pod.x),
                 Pos(pod.y),
-                Speed(pod.vx),
-                Speed(pod.vy),
+                Pos(pod.vx),
+                Pos(pod.vy),
                 Angle(pod.angle),
                 BoostAvailable(pod.boost_available),
                 Timeout(pod.timeout),
@@ -178,7 +169,7 @@ class Observation(CompositeFeature):
             for i in range(5):
                 next_cp = pod.next_checkpoint(world, i)
                 features += [
-                    Speed(next_cp.x - pod.x),
-                    Speed(next_cp.y - pod.y),
+                    Pos(next_cp.x - pod.x),
+                    Pos(next_cp.y - pod.y),
                 ]
         super().__init__(features=features)
