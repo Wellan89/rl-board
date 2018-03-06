@@ -35,7 +35,7 @@ class Pod(Unit):
             lastCP = self.world.circuit.nbcp() - 1
         return self.lap * self.world.circuit.nbcp() + lastCP
 
-    def score(self):
+    def score(self, variation=None):
         current_cp = self.world.circuit.cp(self.ncpid)
         next_cp = self.world.circuit.cp((self.ncpid - 1) % self.world.circuit.nbcp())
         distance_cp_to_ncp = current_cp.distance(next_cp)

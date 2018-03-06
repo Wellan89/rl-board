@@ -13,28 +13,35 @@ VIEWPORT_H = 400
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
-    reward_range = (-10.0, 10.0)
+    reward_range = (-np.inf, np.inf)
     spec = None
 
-    action_space = gym.spaces.Box(low=0.0, high=1.0, shape=(6,), dtype=np.float32)
-    observation_space = gym.spaces.Box(low=-100.0, high=100.0,
-                                       shape=(len(Observation(World()).to_representation()),), dtype=np.float32)
-
     difficulty_level = None
+    variation = None
 
     def __init__(self):
         self.world = World()
         self.viewer = None
 
+        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(6,))
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
+                                                shape=(len(self._get_state()),))
+
     def _get_state(self):
-        state = Observation(self.world).to_representation()
-        # assert(all(-100.0 <= v <= 100.0 for v in state))
+        state = Observation(self.world, variation=self.variation).to_representation()
+        # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
         return state
 
-    def step(self, action):
-        assert len(action) == 6 and all(0.0 <= v <= 1.0 for v in action)
+    def _transform_action(self, action):
+        return action
 
-        current_score = self.world.pods[0].score()
+    def step(self, action):
+        # assert (len(action),) == self.action_space.shape
+        # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
+        action = self._transform_action(action)
+        assert len(action) == 6
+
+        current_score = self.world.pods[0].score(variation=self.variation)
         current_passed_cp = self.world.best_pod(0).nbChecked()
 
         self.world.play(
@@ -65,8 +72,7 @@ class CsbEnv(gym.Env):
         )
 
         if self.difficulty_level == 0:
-            now_score = self.world.best_pod(0).score()
-            #reward = max(now_score - current_score, 0.0)# to test
+            now_score = self.world.pods[0].score(variation=self.variation)
             reward = now_score - current_score
             episode_over = (self.world.turn >= 400)
         elif self.difficulty_level == 1:
@@ -88,7 +94,7 @@ class CsbEnv(gym.Env):
         return self._get_state(), reward, episode_over, None
 
     def reset(self):
-        self.world.reset()
+        self.world = World()
         return self._get_state()
 
     def render(self, mode='human'):
@@ -101,24 +107,39 @@ class CsbEnv(gym.Env):
         def _radius_to_screen(_r):
             return _r * VIEWPORT_W / 16000
 
+        cp_radius = _radius_to_screen(self.world.circuit.cps[0].r + self.world.pods[0].r)
         for cp in self.world.circuit.cps:
             color_ratio = cp.id / (len(self.world.circuit.cps) - 1)
             color = (color_ratio * 0.8, color_ratio * 0.8, 0.2 + color_ratio * 0.8)
-            self.viewer.draw_circle(color=color, radius=_radius_to_screen(cp.r)).add_attr(
+            self.viewer.draw_circle(color=color, radius=cp_radius).add_attr(
                 rendering.Transform(translation=_pos_to_screen(cp))
             )
 
-        for i, pod in enumerate(self.world.pods):
-            self.viewer.draw_circle(color=(int(i >= 2), int(i < 2), 0), radius=_radius_to_screen(pod.r)).add_attr(
+        pod_radius = _radius_to_screen(self.world.pods[0].r)
+        for pod in self.world.pods:
+            color = (float(pod.id >= 2), float(pod.id < 2), 0.0)
+            if pod.shield > 0:
+                self.viewer.draw_circle(color=(0.0, 0.0, 0.6),
+                                        radius=pod_radius + _radius_to_screen(20 * pod.shield)).add_attr(
+                    rendering.Transform(translation=_pos_to_screen(pod))
+                )
+            self.viewer.draw_circle(color=color, radius=pod_radius).add_attr(
                 rendering.Transform(translation=_pos_to_screen(pod))
             )
+            if pod.boost_available:
+                self.viewer.draw_circle(color=(0.0, 0.0, 0.0),
+                                        radius=_radius_to_screen(80)).add_attr(
+                    rendering.Transform(translation=_pos_to_screen(pod))
+                )
 
         return self.viewer.render(return_rgb_array=(mode == 'rgb_array'))
 
 
-class CsbEnvV0D0(CsbEnv):
+class CsbEnvD0V0(CsbEnv):
     difficulty_level = 0
+    variation = 0
 
 
-class CsbEnvV0D1(CsbEnv):
+class CsbEnvD1V0(CsbEnv):
     difficulty_level = 1
+    variation = 0

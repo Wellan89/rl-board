@@ -153,7 +153,7 @@ class PodFeature(CompositeFeature):
 
 
 class Observation(CompositeFeature):
-    def __init__(self, world):
+    def __init__(self, world, variation=None):
         features = [TotalCheckpoints(world.circuit.nbcp() * world.nblaps)]
         for pod in world.pods:
             features += [

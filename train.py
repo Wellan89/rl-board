@@ -52,7 +52,7 @@ def main():
     parser.add_argument('-t', '--timesteps', type=int, default=None, help="Number of timesteps")
     parser.add_argument('-m', '--max-episode-timesteps', type=int, default=None, help="Maximum number of timesteps per episode")
     parser.add_argument('-d', '--deterministic', action='store_true', default=False, help="Choose actions deterministically")
-    parser.add_argument('-l', '--load', help="Load agent from this dir")
+    parser.add_argument('-l', '--load', action='store_true', default=False, help="Load agent from a previous checkpoint")
     parser.add_argument('--monitor', help="Save results to this directory")
     parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
     parser.add_argument('--monitor-video', type=int, default=500, help="Save video every x steps (0 = disabled)")
@@ -87,23 +87,23 @@ def main():
         monitor_video=args.monitor_video
     )
 
+    save_dir = 'logs/{}/checkpoints'.format(args.monitor)
     agent = Agent.from_spec(
         spec=agent,
         kwargs=dict(
             states=environment.states,
             actions=environment.actions,
             network=network,
-            saver=dict(directory='logs/{}/checkpoints'.format(args.monitor), seconds=600),
+            saver=dict(directory=save_dir, seconds=600),
             summarizer=dict(directory='logs/{}/summaries'.format(args.monitor),
                             labels=[],
                             seconds=120)
         )
     )
     if args.load:
-        load_dir = os.path.dirname(args.load)
-        if not os.path.isdir(load_dir):
-            raise OSError("Could not load agent from {}: No such directory.".format(load_dir))
-        agent.restore_model(args.load)
+        if not os.path.isdir(save_dir):
+            raise OSError("Could not load agent from {}: No such directory.".format(save_dir))
+        agent.restore_model(save_dir)
 
     if args.debug:
         logger.info("-" * 16)

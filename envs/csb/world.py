@@ -8,8 +8,27 @@ from envs.csb.pod import Pod
 class World:
 
     def __init__(self):
-        self.pods = [None, None, None, None]
-        self.reset()
+        self.pods = [None] * 4
+        self.circuit = Circuit()
+        self.nblaps = 3
+        self.turn = 0
+
+        distance_to_center = random.choice([500, 1500])
+        cp0x = self.circuit.cp(0).x
+        cp0y = self.circuit.cp(0).y
+        angle = math.pi / 2 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
+        cos_angle = math.cos(angle)
+        sin_angle = math.sin(angle)
+        self.pods[0] = Pod(0, cp0x + cos_angle * distance_to_center,
+                           cp0y + sin_angle * distance_to_center, self)
+        self.pods[1] = Pod(1, cp0x - cos_angle * distance_to_center,
+                           cp0y - sin_angle * distance_to_center, self)
+        self.pods[2] = Pod(2, cp0x + cos_angle * (2000 - distance_to_center),
+                           cp0y + sin_angle * (2000 - distance_to_center), self)
+        self.pods[3] = Pod(3, cp0x - cos_angle * (2000 - distance_to_center),
+                           cp0y - sin_angle * (2000 - distance_to_center), self)
+        for pod in self.pods:
+            pod.angle = angle - math.pi / 2
 
     def play(self, s1, s2):
 
@@ -62,25 +81,6 @@ class World:
 
         for pod in self.pods:
             pod.end()
-
-    def reset(self):
-        self.circuit = Circuit()
-        self.turn = 0
-        distance_to_center = random.choice([500, 1500])
-        cp0x = self.circuit.cp(0).x
-        cp0y = self.circuit.cp(0).y
-        angle = math.pi / 2 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
-        self.pods[0] = Pod(1, cp0x + math.cos(angle) * distance_to_center,
-                           cp0y + math.sin(angle) * distance_to_center, self)
-        self.pods[1] = Pod(2, cp0x - math.cos(angle) * distance_to_center,
-                           cp0y - math.sin(angle) * distance_to_center, self)
-        self.pods[2] = Pod(3, cp0x + math.cos(angle) * (2000-distance_to_center),
-                           cp0y + math.sin(angle) * (2000-distance_to_center), self)
-        self.pods[3] = Pod(4, cp0x - math.cos(angle) * (2000-distance_to_center),
-                           cp0y - math.sin(angle) * (2000-distance_to_center), self)
-        for pod in self.pods:
-            pod.angle = angle - math.pi / 2
-        self.nblaps = 3
 
     def player_won(self, player):
         assert player == 0 or player == 1
