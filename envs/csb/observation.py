@@ -1,7 +1,11 @@
 import math
+import time
 
 from envs.csb import circuit
 from envs.csb import util
+
+
+__IMPORT_TIME__ = time.time()
 
 
 class BaseFeature:
@@ -11,7 +15,6 @@ class BaseFeature:
 
 class Distance(BaseFeature):
     def __init__(self, distance):
-        assert distance >= 0
         self.distance = distance
 
     def to_representation(self):
@@ -36,7 +39,6 @@ class Pos(BaseFeature):
 
 class PassedCheckpoints(BaseFeature):
     def __init__(self, passed_checkpoints):
-        assert passed_checkpoints >= 0
         self.passed_checkpoints = passed_checkpoints
 
     def to_representation(self):
@@ -45,7 +47,6 @@ class PassedCheckpoints(BaseFeature):
 
 class TotalCheckpoints(BaseFeature):
     def __init__(self, total_checkpoints):
-        assert total_checkpoints >= 0
         self.total_checkpoints = total_checkpoints
 
     def to_representation(self):
@@ -54,7 +55,6 @@ class TotalCheckpoints(BaseFeature):
 
 class ShieldTimer(BaseFeature):
     def __init__(self, shield_timer):
-        assert shield_timer <= 4
         if shield_timer < 0:
             shield_timer = 0
         self.shield_timer = shield_timer
@@ -65,7 +65,6 @@ class ShieldTimer(BaseFeature):
 
 class Timeout(BaseFeature):
     def __init__(self, timeout):
-        assert timeout <= util.TIMEOUT
         if timeout < 0:
             timeout = 0
         self.timeout = timeout
@@ -76,7 +75,6 @@ class Timeout(BaseFeature):
 
 class BoostAvailable(BaseFeature):
     def __init__(self, boost_available):
-        assert boost_available is True or boost_available is False
         self.boost_available = boost_available
 
     def to_representation(self):
@@ -154,30 +152,47 @@ class PodFeature(CompositeFeature):
 
 class Observation(CompositeFeature):
     def __init__(self, world, variation=None):
-        features = [TotalCheckpoints(world.circuit.nbcp() * world.nblaps)]
+        hard_features_mask = min((time.time() - __IMPORT_TIME__) / (3600 * 2), 1.0) if variation == 7 else 1.0
+        features = [TotalCheckpoints(world.circuit.nbcp() * world.nblaps * hard_features_mask)]
         for pod in world.pods:
+            if pod.id != 0 and (variation == 3 or variation == 5 or variation == 6):
+                break
+
+            pod_features_mask = hard_features_mask if pod.id != 0 else 1.0
             features += [
-                Pos(pod.x),
-                Pos(pod.y),
-                Pos(pod.vx),
-                Pos(pod.vy),
-                Angle(pod.angle),
-                BoostAvailable(pod.boost_available),
-                Timeout(pod.timeout),
-                ShieldTimer(pod.shield),
-                PassedCheckpoints(pod.nbChecked()),
+                Pos(pod.x * pod_features_mask),
+                Pos(pod.y * pod_features_mask),
+                Pos(pod.vx * pod_features_mask),
+                Pos(pod.vy * pod_features_mask),
+                Angle(pod.angle * pod_features_mask),
             ]
-        for i in range(circuit.MAX_NB_CHECKPOINTS):
-            if i < world.circuit.nbcp():
-                cp = world.circuit.cp(i)
+            if variation != 3 and variation != 6:
                 features += [
-                    Pos(cp.x),
-                    Pos(cp.y),
+                    BoostAvailable(float(pod.boost_available) * hard_features_mask),
+                    Timeout(pod.timeout * hard_features_mask),
+                    ShieldTimer(pod.shield * hard_features_mask),
+                    PassedCheckpoints(pod.nbChecked() * hard_features_mask),
                 ]
-            else:
-                features += [
-                    Pos(0.0),
-                    Pos(0.0),
-                ]
+            if variation >= 2:
+                for i in range(3):
+                    cp = pod.next_checkpoint(world, i)
+                    features += [
+                        Pos(cp.x * pod_features_mask),
+                        Pos(cp.y * pod_features_mask),
+                    ]
+
+        if variation != 3 and variation != 5 and variation != 6:
+            for i in range(circuit.MAX_NB_CHECKPOINTS):
+                if i < world.circuit.nbcp():
+                    cp = world.circuit.cp(i)
+                    features += [
+                        Pos(cp.x * hard_features_mask),
+                        Pos(cp.y * hard_features_mask),
+                    ]
+                else:
+                    features += [
+                        Pos(0.0),
+                        Pos(0.0),
+                    ]
 
         super().__init__(features=features)

@@ -37,6 +37,8 @@ import envs
 
 # python train.py csb-d0-v0 -a agents/trpo-v0.json -n networks/mlp-v1.json
 
+# TODO: Variant 4 with all direct inputs (target x, target y...)
+#       Look at SerpentAI
 
 def _basename_no_ext(filename):
     return os.path.splitext(os.path.basename(filename))[0]

@@ -140,6 +140,75 @@ class CsbEnvD0V0(CsbEnv):
     variation = 0
 
 
+class CsbEnvD0Var1V0(CsbEnv):
+    difficulty_level = 0
+    variation = 1
+
+
+class CsbEnvD0Var2V0(CsbEnv):
+    difficulty_level = 0
+    variation = 2
+
+
+class CsbEnvD0Var3V0(CsbEnv):
+    difficulty_level = 0
+    variation = 3
+
+
+class CsbEnvD0Var4V0(CsbEnv):
+    difficulty_level = 0
+    variation = 4
+
+    def __init__(self):
+        super().__init__()
+        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(10,))
+
+    def _transform_action(self, action):
+        assert len(action) == 10
+        ret_action = []
+        for i in range(0, 10, 5):
+            pod_action = action[i:i+5]
+            angle = 0.5 + 0.25 * (pod_action[0] - pod_action[1])
+            speed = 0.2 + 0.6 * pod_action[2]
+            if pod_action[3] > 0.5:
+                boost_normal_or_shield = 0.0
+            elif pod_action[4] > 0.5:
+                boost_normal_or_shield = 1.0
+            else:
+                boost_normal_or_shield = 0.5
+            ret_action += [angle, speed, boost_normal_or_shield]
+        return ret_action
+
+
+class CsbEnvD0Var5V0(CsbEnvD0Var4V0):
+    difficulty_level = 0
+    variation = 5
+
+
+class CsbEnvD0Var6V0(CsbEnv):
+    difficulty_level = 0
+    variation = 6
+
+    def __init__(self):
+        super().__init__()
+        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(8,))
+
+    def _transform_action(self, action):
+        assert len(action) == 8
+        ret_action = []
+        for i in range(0, 8, 4):
+            pod_action = action[i:i+4]
+            angle = 0.5 + 0.25 * (pod_action[0] - pod_action[1])
+            speed = 0.2 + 0.6 * pod_action[2]
+            ret_action += [angle, speed, pod_action[3]]
+        return ret_action
+
+
+class CsbEnvD0Var7V0(CsbEnv):
+    difficulty_level = 0
+    variation = 7
+
+
 class CsbEnvD1V0(CsbEnv):
     difficulty_level = 1
     variation = 0

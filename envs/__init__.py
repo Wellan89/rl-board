@@ -5,6 +5,34 @@ register(
     entry_point='envs.csb.env:CsbEnvD0V0',
 )
 register(
+    id='csb-d0-var1-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var1V0',
+)
+register(
+    id='csb-d0-var2-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var2V0',
+)
+register(
+    id='csb-d0-var3-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var3V0',
+)
+register(
+    id='csb-d0-var4-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var4V0',
+)
+register(
+    id='csb-d0-var5-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var5V0',
+)
+register(
+    id='csb-d0-var6-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var6V0',
+)
+register(
+    id='csb-d0-var7-v0',
+    entry_point='envs.csb.env:CsbEnvD0Var7V0',
+)
+register(
     id='csb-d1-v0',
     entry_point='envs.csb.env:CsbEnvD1V0',
 )
