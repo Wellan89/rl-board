@@ -36,7 +36,7 @@ class CsbEnv(gym.Env):
             Solution(
                 move1=Move(
                     g1=action[0],
-                    g2=action[1]/3,
+                    g2=action[1],
                     g3=0.5,
                 ),
                 move2=Move(

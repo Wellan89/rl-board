@@ -167,7 +167,17 @@ class Observation(CompositeFeature):
             Speed(world.pods[0].vy),
             Angle(world.pods[0].angle * math.pi / 180),
             Speed(world.pods[0].next_checkpoint(world, 0).x - world.pods[0].x),
-            Speed(world.pods[0].next_checkpoint(world, 0).y - world.pods[0].y)
+            Speed(world.pods[0].next_checkpoint(world, 0).y - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 1).x - world.pods[0].x),
+            Speed(world.pods[0].next_checkpoint(world, 1).y - world.pods[0].x),
+            Speed(world.pods[0].next_checkpoint(world, 2).x - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 2).y - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 3).x - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 3).y - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 4).x - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 4).y - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 5).x - world.pods[0].y),
+            Speed(world.pods[0].next_checkpoint(world, 5).y - world.pods[0].y),
             # Speed(world.pods[0].vy)
             # TotalCheckpoints(world.circuit.nbcp() * world.nblaps),
             # PodFeature(world, world.best_pod(0), world.second_pod(0), world.best_pod(1), world.second_pod(1)),

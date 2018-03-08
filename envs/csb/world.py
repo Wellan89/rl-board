@@ -8,7 +8,7 @@ from envs.csb.pod import Pod
 class World:
 
     def __init__(self):
-        self.pods = [None, None, None, None]
+        self.pods = [None]
         self.reset()
 
     def play(self, s1, s2):
@@ -20,9 +20,9 @@ class World:
                 pod.shield -= 1
 
         self.pods[0].apply_move(s1.move1)
-        self.pods[1].apply_move(s1.move2)
-        self.pods[2].apply_move(s2.move1)
-        self.pods[3].apply_move(s2.move2)
+        # self.pods[1].apply_move(s1.move2)
+        # self.pods[2].apply_move(s2.move1)
+        # self.pods[3].apply_move(s2.move2)
 
         t = 0.0
         previousCollision = False
@@ -72,12 +72,12 @@ class World:
         angle = math.pi / 2 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
         self.pods[0] = Pod(1, cp0x + math.cos(angle) * distance_to_center,
                            cp0y + math.sin(angle) * distance_to_center, self)
-        self.pods[1] = Pod(2, cp0x - math.cos(angle) * distance_to_center,
-                           cp0y - math.sin(angle) * distance_to_center, self)
-        self.pods[2] = Pod(3, cp0x + math.cos(angle) * (2000-distance_to_center),
-                           cp0y + math.sin(angle) * (2000-distance_to_center), self)
-        self.pods[3] = Pod(4, cp0x - math.cos(angle) * (2000-distance_to_center),
-                           cp0y - math.sin(angle) * (2000-distance_to_center), self)
+        # self.pods[1] = Pod(2, cp0x - math.cos(angle) * distance_to_center,
+        #                    cp0y - math.sin(angle) * distance_to_center, self)
+        # self.pods[2] = Pod(3, cp0x + math.cos(angle) * (2000-distance_to_center),
+        #                    cp0y + math.sin(angle) * (2000-distance_to_center), self)
+        # self.pods[3] = Pod(4, cp0x - math.cos(angle) * (2000-distance_to_center),
+        #                    cp0y - math.sin(angle) * (2000-distance_to_center), self)
         for pod in self.pods:
             pod.angle = angle - math.pi / 2
         self.nblaps = 3
