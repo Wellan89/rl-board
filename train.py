@@ -27,12 +27,36 @@ import logging
 import os
 import time
 
+import tensorflow as tf
+from tensorflow.python import pywrap_tensorflow
 from tensorforce import TensorForceError
 from tensorforce.agents import Agent
 from tensorforce.execution import Runner
 from tensorforce.contrib.openai_gym import OpenAIGym
 
 import envs
+
+
+def _restore(filename, agent):
+    tensor_codes = {
+        'dense0/W': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
+        'dense0/b': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/b',
+        'dense1/W': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/W',
+        'dense1/b': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/b',
+        'alpha/W': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/W',
+        'alpha/b': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/b',
+        'beta/W': 'trpo/actions-and-internals/beta/parameterize/beta/apply/W',
+        'beta/b': 'trpo/actions-and-internals/beta/parameterize/beta/apply/b',
+    }
+
+    reader = pywrap_tensorflow.NewCheckpointReader(filename)
+    with agent.model.graph.as_default():
+        all_vars = tf.global_variables()
+        for tensor_name in tensor_codes.values():
+            matching_vars = [var for var in all_vars if var.op.name == tensor_name]
+            assert len(matching_vars) == 1
+            tensor_val = reader.get_tensor(tensor_name)
+            matching_vars[0].load(tensor_val, agent.model.session)
 
 
 # python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
@@ -52,7 +76,7 @@ def main():
     parser.add_argument('-t', '--timesteps', type=int, default=None, help="Number of timesteps")
     parser.add_argument('-m', '--max-episode-timesteps', type=int, default=None, help="Maximum number of timesteps per episode")
     parser.add_argument('-d', '--deterministic', action='store_true', default=False, help="Choose actions deterministically")
-    parser.add_argument('-l', '--load', action='store_true', default=False, help="Load agent from a previous checkpoint")
+    parser.add_argument('-l', '--load', default=None, help="Load agent from a previous checkpoint")
     parser.add_argument('--monitor', help="Save results to this directory")
     parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
     parser.add_argument('--monitor-video', type=int, default=1000, help="Save video every x steps (0 = disabled)")
@@ -101,9 +125,10 @@ def main():
         )
     )
     if args.load:
-        if not os.path.isdir(save_dir):
-            raise OSError("Could not load agent from {}: No such directory.".format(save_dir))
-        agent.restore_model(save_dir)
+        # if not os.path.isdir(save_dir):
+        #     raise OSError("Could not load agent from {}: No such directory.".format(save_dir))
+        # agent.restore_model(save_dir)
+        _restore(args.load, agent)
 
     if args.debug:
         logger.info("-" * 16)

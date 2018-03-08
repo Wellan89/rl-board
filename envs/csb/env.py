@@ -6,6 +6,7 @@ from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
 from envs.csb.observation import Observation
+from envs.csb.util import MAX_EPISODE_LENGTH
 
 VIEWPORT_W = 710
 VIEWPORT_H = 400
@@ -16,9 +17,9 @@ class CsbEnv(gym.Env):
     reward_range = (-np.inf, np.inf)
     spec = None
 
-    use_scored_reward = None
     use_timed_features_mask = False
     use_cp_dist_score = False
+    enable_dummy_opponent = False
 
     def __init__(self):
         self.world = World()
@@ -43,7 +44,26 @@ class CsbEnv(gym.Env):
         assert len(action) == 6
 
         current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-        current_passed_cp = self.world.best_pod(0).nbChecked()
+        opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+
+        if not self.enable_dummy_opponent:
+            opp_solution = Solution(  # Empty solution : enemy doesn't move
+                move1=Move(
+                    g1=0.5,
+                    g2=0,
+                    g3=0.5,
+                ),
+                move2=Move(
+                    g1=0.5,
+                    g2=0,
+                    g3=0.5,
+                ),
+            )
+        else:
+            opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
+                self.world.pods[2].to_dummy_move(speed=0.1),
+                self.world.pods[3].to_dummy_move(speed=0.1),
+            )
 
         self.world.play(
             Solution(
@@ -58,35 +78,24 @@ class CsbEnv(gym.Env):
                     g3=action[5],
                 )
             ),
-            Solution(  # Placeholder : enemy doesn't move
-                move1=Move(
-                    g1=0.5,
-                    g2=0,
-                    g3=0.5,
-                ),
-                move2=Move(
-                    g1=0.5,
-                    g2=0,
-                    g3=0.5,
-                ),
-            )
+            opp_solution
         )
 
-        if self.use_scored_reward:
+        if not self.enable_dummy_opponent:
             now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
             reward = now_score - current_score
-            episode_over = (self.world.turn >= 400)
+            episode_over = (self.world.turn >= MAX_EPISODE_LENGTH)
         else:
             if self.world.player_won(1):
                 episode_over = True
-                reward = -10.0
+                reward = 0.0
             elif self.world.player_won(0):
                 episode_over = True
-                reward = 10.0
+                reward = 20.0
             else:
-                now_passed_cp = max(map(lambda pod: pod.nbChecked(), self.world.pods[:2]))
-                assert now_passed_cp >= current_passed_cp
-                reward = (now_passed_cp - current_passed_cp) * 0.1
+                now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+                opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+                reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
                 episode_over = False
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
@@ -135,18 +144,12 @@ class CsbEnv(gym.Env):
 
 
 class CsbEnvD0V0(CsbEnv):
-    use_scored_reward = True
     use_cp_dist_score = True
     use_timed_features_mask = True
+    enable_dummy_opponent = False
 
 
 class CsbEnvD1V0(CsbEnv):
-    use_scored_reward = True
-    use_cp_dist_score = False
+    use_cp_dist_score = True
     use_timed_features_mask = False
-
-
-class CsbEnvD2V0(CsbEnv):
-    use_scored_reward = False
-    use_cp_dist_score = False
-    use_timed_features_mask = False
+    enable_dummy_opponent = True

@@ -1,5 +1,6 @@
 import math
 
+from envs.csb.move import Move
 from envs.csb.unit import Unit
 from envs.csb.util import LIN, MAX_THRUST, TIMEOUT
 
@@ -36,8 +37,8 @@ class Pod(Unit):
         return self.lap * self.world.circuit.nbcp() + lastCP
 
     def score(self, use_cp_dist_score=False):
-        current_cp = self.world.circuit.cp(self.ncpid)
-        next_cp = self.world.circuit.cp((self.ncpid - 1) % self.world.circuit.nbcp())
+        current_cp = self.world.circuit.cp((self.ncpid - 1) % self.world.circuit.nbcp())
+        next_cp = self.world.circuit.cp(self.ncpid)
         distance_cp_to_ncp = current_cp.distance(next_cp)
         if use_cp_dist_score:
             cp_dist_score = (distance_cp_to_ncp - self.distance(self.world.circuit.cp(self.ncpid))) / distance_cp_to_ncp
@@ -174,3 +175,11 @@ class Pod(Unit):
     def next_checkpoint(self, world, number_next):
         target_cpid = (self.ncpid + number_next) % world.circuit.nbcp()
         return world.circuit.cp(target_cpid)
+
+    def to_dummy_move(self, speed):
+        next_cp = self.world.circuit.cp(self.ncpid)
+        return Move(
+            g1=min(max(LIN(self.diffAngle(next_cp), -18.0, 0.25, 18.0, 0.75), 0), 1),
+            g2=0.2 + speed * 0.6,
+            g3=0.5
+        )
