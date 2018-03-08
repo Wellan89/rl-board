@@ -73,7 +73,7 @@ def main():
     parser.add_argument('-D', '--debug', action='store_true', help="Show debug outputs")
     parser.add_argument('--monitor', help="Save results to this directory")
     parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
-    parser.add_argument('--monitor-video', type=int, default=500, help="Save video every x steps (0 = disabled)")
+    parser.add_argument('--monitor-video', type=int, default=1000, help="Save video every x steps (0 = disabled)")
 
     args = parser.parse_args()
 
@@ -173,7 +173,7 @@ def main():
         gym_id=args.gym_id,
         monitor='logs/{}/gym'.format(args.monitor) if do_monitor and args.monitor else None,
         monitor_safe=args.monitor_safe if do_monitor else None,
-        monitor_video=args.monitor_video if do_monitor and args.monitor_video else None
+        monitor_video=args.monitor_video // args.num_workers if do_monitor and args.monitor_video else None
     )
 
     logging.basicConfig(level=logging.INFO)

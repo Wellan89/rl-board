@@ -35,15 +35,15 @@ class Pod(Unit):
             lastCP = self.world.circuit.nbcp() - 1
         return self.lap * self.world.circuit.nbcp() + lastCP
 
-    def score(self, variation=None):
+    def score(self, use_cp_dist_score=False):
         current_cp = self.world.circuit.cp(self.ncpid)
         next_cp = self.world.circuit.cp((self.ncpid - 1) % self.world.circuit.nbcp())
         distance_cp_to_ncp = current_cp.distance(next_cp)
-        cp_dist_score = (distance_cp_to_ncp - self.distance(self.world.circuit.cp(self.ncpid))) / distance_cp_to_ncp
-        if variation == 1:
-            return self.nbChecked() + max(min(cp_dist_score, 1.0), 0.0)
+        if use_cp_dist_score:
+            cp_dist_score = (distance_cp_to_ncp - self.distance(self.world.circuit.cp(self.ncpid))) / distance_cp_to_ncp
         else:
-            return self.nbChecked() + cp_dist_score
+            cp_dist_score = 0.0
+        return self.nbChecked() + cp_dist_score
 
     def getAngle(self, p):
         d = self.distance(p)

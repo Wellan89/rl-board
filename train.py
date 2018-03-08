@@ -35,10 +35,8 @@ from tensorforce.contrib.openai_gym import OpenAIGym
 import envs
 
 
-# python train.py csb-d0-v0 -a agents/trpo-v0.json -n networks/mlp-v1.json
+# python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
 
-# TODO: Variant 4 with all direct inputs (target x, target y...)
-#       Look at SerpentAI
 
 def _basename_no_ext(filename):
     return os.path.splitext(os.path.basename(filename))[0]
@@ -57,7 +55,7 @@ def main():
     parser.add_argument('-l', '--load', action='store_true', default=False, help="Load agent from a previous checkpoint")
     parser.add_argument('--monitor', help="Save results to this directory")
     parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
-    parser.add_argument('--monitor-video', type=int, default=500, help="Save video every x steps (0 = disabled)")
+    parser.add_argument('--monitor-video', type=int, default=1000, help="Save video every x steps (0 = disabled)")
     parser.add_argument('-D', '--debug', action='store_true', default=False, help="Show debug outputs")
 
     args = parser.parse_args()

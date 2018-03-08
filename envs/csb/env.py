@@ -16,8 +16,9 @@ class CsbEnv(gym.Env):
     reward_range = (-np.inf, np.inf)
     spec = None
 
-    difficulty_level = None
-    variation = None
+    use_scored_reward = None
+    use_timed_features_mask = False
+    use_cp_dist_score = False
 
     def __init__(self):
         self.world = World()
@@ -28,7 +29,7 @@ class CsbEnv(gym.Env):
                                                 shape=(len(self._get_state()),))
 
     def _get_state(self):
-        state = Observation(self.world, variation=self.variation).to_representation()
+        state = Observation(self.world, use_timed_features_mask=self.use_timed_features_mask).to_representation()
         # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
         return state
 
@@ -41,7 +42,7 @@ class CsbEnv(gym.Env):
         action = self._transform_action(action)
         assert len(action) == 6
 
-        current_score = self.world.pods[0].score(variation=self.variation)
+        current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
         current_passed_cp = self.world.best_pod(0).nbChecked()
 
         self.world.play(
@@ -71,11 +72,11 @@ class CsbEnv(gym.Env):
             )
         )
 
-        if self.difficulty_level == 0:
-            now_score = self.world.pods[0].score(variation=self.variation)
+        if self.use_scored_reward:
+            now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
             reward = now_score - current_score
             episode_over = (self.world.turn >= 400)
-        elif self.difficulty_level == 1:
+        else:
             if self.world.player_won(1):
                 episode_over = True
                 reward = -10.0
@@ -87,8 +88,6 @@ class CsbEnv(gym.Env):
                 assert now_passed_cp >= current_passed_cp
                 reward = (now_passed_cp - current_passed_cp) * 0.1
                 episode_over = False
-        else:
-            raise ValueError('Unknown difficulty level: {}'.format(self.difficulty_level))
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, None
@@ -136,79 +135,18 @@ class CsbEnv(gym.Env):
 
 
 class CsbEnvD0V0(CsbEnv):
-    difficulty_level = 0
-    variation = 0
-
-
-class CsbEnvD0Var1V0(CsbEnv):
-    difficulty_level = 0
-    variation = 1
-
-
-class CsbEnvD0Var2V0(CsbEnv):
-    difficulty_level = 0
-    variation = 2
-
-
-class CsbEnvD0Var3V0(CsbEnv):
-    difficulty_level = 0
-    variation = 3
-
-
-class CsbEnvD0Var4V0(CsbEnv):
-    difficulty_level = 0
-    variation = 4
-
-    def __init__(self):
-        super().__init__()
-        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(10,))
-
-    def _transform_action(self, action):
-        assert len(action) == 10
-        ret_action = []
-        for i in range(0, 10, 5):
-            pod_action = action[i:i+5]
-            angle = 0.5 + 0.25 * (pod_action[0] - pod_action[1])
-            speed = 0.2 + 0.6 * pod_action[2]
-            if pod_action[3] > 0.5:
-                boost_normal_or_shield = 0.0
-            elif pod_action[4] > 0.5:
-                boost_normal_or_shield = 1.0
-            else:
-                boost_normal_or_shield = 0.5
-            ret_action += [angle, speed, boost_normal_or_shield]
-        return ret_action
-
-
-class CsbEnvD0Var5V0(CsbEnvD0Var4V0):
-    difficulty_level = 0
-    variation = 5
-
-
-class CsbEnvD0Var6V0(CsbEnv):
-    difficulty_level = 0
-    variation = 6
-
-    def __init__(self):
-        super().__init__()
-        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(8,))
-
-    def _transform_action(self, action):
-        assert len(action) == 8
-        ret_action = []
-        for i in range(0, 8, 4):
-            pod_action = action[i:i+4]
-            angle = 0.5 + 0.25 * (pod_action[0] - pod_action[1])
-            speed = 0.2 + 0.6 * pod_action[2]
-            ret_action += [angle, speed, pod_action[3]]
-        return ret_action
-
-
-class CsbEnvD0Var7V0(CsbEnv):
-    difficulty_level = 0
-    variation = 7
+    use_scored_reward = True
+    use_cp_dist_score = True
+    use_timed_features_mask = True
 
 
 class CsbEnvD1V0(CsbEnv):
-    difficulty_level = 1
-    variation = 0
+    use_scored_reward = True
+    use_cp_dist_score = False
+    use_timed_features_mask = False
+
+
+class CsbEnvD2V0(CsbEnv):
+    use_scored_reward = False
+    use_cp_dist_score = False
+    use_timed_features_mask = False
