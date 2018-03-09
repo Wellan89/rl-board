@@ -14,13 +14,14 @@ VIEWPORT_H = 400
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
-    reward_range = (-np.inf, np.inf)
+    reward_range = (0, MAX_EPISODE_LENGTH * 6)
     spec = None
 
     use_timed_features_mask = False
     use_cp_dist_score = False
     enable_dummy_opponent = False
     enable_vincent_opponent = False
+    reward_copy_opponent = False
 
     def __init__(self):
         self.world = World()
@@ -73,6 +74,11 @@ class CsbEnv(gym.Env):
                 ),
             )
 
+        if self.reward_copy_opponent:
+            # TODO : with vincent algo
+            dummy_move1 = self.world.pods[0].to_dummy_move(speed=0.2)
+            dummy_move2 = self.world.pods[1].to_dummy_move(speed=0.2)
+
         self.world.play(
             Solution(
                 move1=Move(
@@ -89,22 +95,33 @@ class CsbEnv(gym.Env):
             opp_solution
         )
 
-        if not self.enable_dummy_opponent:
-            now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-            reward = now_score - current_score
+        if self.reward_copy_opponent:
+            reward = 1 - (
+                abs(action[0] - dummy_move1.g1) +
+                abs(action[1] - dummy_move1.g2) +
+                abs(action[2] - dummy_move1.g3) +
+                abs(action[3] - dummy_move2.g1) +
+                abs(action[4] - dummy_move2.g2) +
+                abs(action[5] - dummy_move2.g3)
+            ) / 6
             episode_over = (self.world.turn >= MAX_EPISODE_LENGTH)
         else:
-            if self.world.player_won(1):
-                episode_over = True
-                reward = 0.0
-            elif self.world.player_won(0):
-                episode_over = True
-                reward = 20.0
-            else:
+            if not self.enable_dummy_opponent:
                 now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-                opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
-                reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
-                episode_over = False
+                reward = now_score - current_score
+                episode_over = (self.world.turn >= MAX_EPISODE_LENGTH)
+            else:
+                if self.world.player_won(1):
+                    episode_over = True
+                    reward = 0.0
+                elif self.world.player_won(0):
+                    episode_over = True
+                    reward = 20.0
+                else:
+                    now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+                    opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+                    reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
+                    episode_over = False
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, None
@@ -169,4 +186,6 @@ class CsbEnvD1V0(CsbEnv):
 
 
 class CsbEnvSalim(CsbEnv):
-    enable_vincent_opponent = True
+    # enable_vincent_opponent = True  # TODO : debug to enable this
+    enable_dummy_opponent = True
+    reward_copy_opponent = True
