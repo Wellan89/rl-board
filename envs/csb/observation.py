@@ -99,7 +99,7 @@ class CompositeFeature(BaseFeature):
 class Observation(CompositeFeature):
     def __init__(self, world, use_timed_features_mask=False):
         hard_features_mask = min((time.time() - __IMPORT_TIME__) / (3600 * 2), 1.0) if use_timed_features_mask else 1.0
-        features = [TotalCheckpoints(world.circuit.nbcp() * world.nblaps * hard_features_mask)]
+        features = [Pos(1000)]  # Try this if maybe it isn't hardwired in lib
         for pod in world.pods[:2]:
             pod_features_mask = hard_features_mask if pod.id != 0 else 1.0
             features += [
