@@ -177,6 +177,9 @@ class Pod(Unit):
         return world.circuit.cp(target_cpid)
 
     def to_dummy_move(self, speed):
+        if speed == 0.0:
+            return Move(0.5, 0, 0.5)
+
         next_cp = self.world.circuit.cp(self.ncpid)
         return Move(
             g1=min(max(LIN(self.diffAngle(next_cp), -18.0, 0.25, 18.0, 0.75), 0), 1),

@@ -16,7 +16,6 @@ def LIN(x, x1, y1, x2, y2):
 MAX_THRUST = 200
 NBPOD = 4
 TIMEOUT = 100
-MAX_NB_CHECKPOINTS = 6
 
 
 class Model:
@@ -64,17 +63,35 @@ class Point:
 
 
 class Pod:
-    def __init__(self, x, y, vx, vy, angle, next_check_point_id):
+    def __init__(self):
+        self.x = None
+        self.y = None
+        self.vx = None
+        self.vy = None
+        self.angle = None
+        self.next_check_point_id = None
+        self.boost_available = True
+        self.shield = 0
+        self.lap = 0
+        self.timeout = TIMEOUT
+
+    def read_turn(self):
+        x, y, vx, vy, angle, next_check_point_id = map(int, input().split())
+
+        if (self.next_check_point_id != next_check_point_id):
+            self.timeout = TIMEOUT
+            if (next_check_point_id == 1):
+                self.lap += 1
+
         self.x = x
         self.y = y
         self.vx = vx
         self.vy = vy
         self.angle = angle
         self.next_check_point_id = next_check_point_id
-        self.boost_available = True  # TODO
-        self.shield = 0  # TODO
-        self.lap = 0  # TODO
-        self.timeout = 0  # TODO
+
+        if self.shield > 0:
+            self.shield -= 1
 
     def next_checkpoint(self, game_state, number_next):
         target_cpid = (self.next_check_point_id + number_next) % len(game_state.checkpoints)
@@ -115,19 +132,22 @@ class Pod:
         px = self.x + math.cos(a) * 1000000.0
         py = self.y + math.sin(a) * 1000000.0
         power = self.get_new_power(move[1])
-        if move[2] < 0.05:
+        if move[2] < 0.05 and self.boost_available:
+            self.boost_available = False
             print('{:.0f} {:.0f} BOOST'.format(px, py))
         elif move[2] > 0.95:
+            self.shield = 4
             print('{:.0f} {:.0f} SHIELD'.format(px, py))
         else:
             print('{:.0f} {:.0f} {:.0f}'.format(px, py, power))
+        self.timeout -= 1
 
 
 class GameState:
     def __init__(self, laps, checkpoints):
         self.laps = laps
         self.checkpoints = checkpoints
-        self.pods = None
+        self.pods = [Pod() for _ in range (4)]
 
     @classmethod
     def read_initial(cls):
@@ -137,7 +157,8 @@ class GameState:
         return cls(laps, checkpoints)
 
     def read_turn(self):
-        self.pods = [Pod(*[int(j) for j in input().split()]) for _ in range(4)]
+        for pod in self.pods:
+            pod.read_turn()
 
     def extract_state(self):
         features = [len(self.checkpoints) * self.laps]
@@ -159,7 +180,7 @@ class GameState:
                     cp.x / 1000,
                     cp.y / 1000,
                 ]
-        for i in range(MAX_NB_CHECKPOINTS):
+        for i in range(6):
             cp = self.checkpoints[i] if i < len(self.checkpoints) else Point(0.0, 0.0)
             features += [
                 cp.x / 1000,

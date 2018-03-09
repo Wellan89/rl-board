@@ -6,7 +6,6 @@ from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
 from envs.csb.observation import Observation
-from envs.csb.util import MAX_EPISODE_LENGTH
 
 VIEWPORT_W = 710
 VIEWPORT_H = 400
@@ -19,7 +18,7 @@ class CsbEnv(gym.Env):
 
     use_timed_features_mask = False
     use_cp_dist_score = False
-    enable_dummy_opponent = False
+    dummy_opponent_speed = 0.0
 
     def __init__(self):
         self.world = World()
@@ -46,45 +45,23 @@ class CsbEnv(gym.Env):
         current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
         opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
 
-        if not self.enable_dummy_opponent:
-            opp_solution = Solution(  # Empty solution : enemy doesn't move
-                move1=Move(
-                    g1=0.5,
-                    g2=0,
-                    g3=0.5,
-                ),
-                move2=Move(
-                    g1=0.5,
-                    g2=0,
-                    g3=0.5,
-                ),
-            )
-        else:
-            opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
-                self.world.pods[2].to_dummy_move(speed=0.1),
-                self.world.pods[3].to_dummy_move(speed=0.1),
-            )
-
-        self.world.play(
-            Solution(
-                move1=Move(
-                    g1=action[0],
-                    g2=action[1],
-                    g3=action[2],
-                ),
-                move2=Move(
-                    g1=action[3],
-                    g2=action[4],
-                    g3=action[5],
-                )
-            ),
-            opp_solution
+        agent_solution = Solution(
+            move1=Move(g1=action[0], g2=action[1], g3=action[2]),
+            move2=Move(g1=action[3], g2=action[4], g3=action[5]),
         )
 
-        if not self.enable_dummy_opponent:
+        # Dummy solution : straight line toward the next checkpoint
+        opp_solution = Solution(
+            move1=self.world.pods[2].to_dummy_move(speed=self.dummy_opponent_speed),
+            move2=self.world.pods[3].to_dummy_move(speed=self.dummy_opponent_speed),
+        )
+
+        self.world.play(agent_solution, opp_solution)
+
+        if self.dummy_opponent_speed == 0.0:
             now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
             reward = now_score - current_score
-            episode_over = (self.world.turn >= MAX_EPISODE_LENGTH)
+            episode_over = (self.world.turn >= 400)
         else:
             if self.world.player_won(1):
                 episode_over = True
@@ -146,10 +123,16 @@ class CsbEnv(gym.Env):
 class CsbEnvD0V0(CsbEnv):
     use_cp_dist_score = True
     use_timed_features_mask = True
-    enable_dummy_opponent = False
+    dummy_opponent_speed = 0.0
 
 
 class CsbEnvD1V0(CsbEnv):
     use_cp_dist_score = True
     use_timed_features_mask = False
-    enable_dummy_opponent = True
+    dummy_opponent_speed = 0.1
+
+
+class CsbEnvD2V0(CsbEnv):
+    use_cp_dist_score = True
+    use_timed_features_mask = False
+    dummy_opponent_speed = 0.4
