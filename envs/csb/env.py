@@ -20,6 +20,7 @@ class CsbEnv(gym.Env):
     use_timed_features_mask = False
     use_cp_dist_score = False
     enable_dummy_opponent = False
+    enable_vincent_opponent = False
 
     def __init__(self):
         self.world = World()
@@ -46,7 +47,19 @@ class CsbEnv(gym.Env):
         current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
         opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
 
-        if not self.enable_dummy_opponent:
+        if self.enable_dummy_opponent:
+            opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
+                self.world.pods[2].to_dummy_move(speed=0.2),
+                self.world.pods[3].to_dummy_move(speed=0.2),
+            )
+        elif self.enable_vincent_opponent:
+            self.world.interface.feed(self.world)  # OOP as intended lol
+            move1, move2 = self.world.interface.get_moves(self.world, 1)
+            opp_solution = Solution(
+                move1=move1,
+                move2=move2,
+            )
+        else:
             opp_solution = Solution(  # Empty solution : enemy doesn't move
                 move1=Move(
                     g1=0.5,
@@ -58,11 +71,6 @@ class CsbEnv(gym.Env):
                     g2=0,
                     g3=0.5,
                 ),
-            )
-        else:
-            opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
-                self.world.pods[2].to_dummy_move(speed=0.1),
-                self.world.pods[3].to_dummy_move(speed=0.1),
             )
 
         self.world.play(
@@ -139,6 +147,11 @@ class CsbEnv(gym.Env):
                                         radius=_radius_to_screen(80)).add_attr(
                     rendering.Transform(translation=_pos_to_screen(pod))
                 )
+            self.viewer.draw_line(
+                color=color,
+                start=_pos_to_screen(pod),
+                end=_pos_to_screen(pod.next_checkpoint(self.world)),
+            )
 
         return self.viewer.render(return_rgb_array=(mode == 'rgb_array'))
 
@@ -153,3 +166,7 @@ class CsbEnvD1V0(CsbEnv):
     use_cp_dist_score = True
     use_timed_features_mask = False
     enable_dummy_opponent = True
+
+
+class CsbEnvSalim(CsbEnv):
+    enable_vincent_opponent = True

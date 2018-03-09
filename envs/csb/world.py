@@ -3,6 +3,7 @@ import math
 from envs.csb.collision import Collision
 from envs.csb.circuit import Circuit
 from envs.csb.pod import Pod
+from envs.csb.vincent_algo import VincentSalimInterface
 
 
 class World:
@@ -29,6 +30,9 @@ class World:
                            cp0y - sin_angle * (2000 - distance_to_center), self)
         for pod in self.pods:
             pod.angle = angle - math.pi / 2
+
+        self.interface = VincentSalimInterface()
+        self.interface.start(self)
 
     def play(self, s1, s2):
 

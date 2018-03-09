@@ -12,3 +12,8 @@ register(
     id='csb-d2-v0',
     entry_point='envs.csb.env:CsbEnvD2V0',
 )
+
+register(
+    id='csb-d3-v0',
+    entry_point='envs.csb.env:CsbEnvSalim',
+)
