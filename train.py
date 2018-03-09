@@ -26,7 +26,9 @@ import json
 import logging
 import os
 import time
+import uuid
 
+import shutil
 import tensorflow as tf
 from tensorflow.python import pywrap_tensorflow
 from tensorforce import TensorForceError
@@ -35,6 +37,11 @@ from tensorforce.execution import Runner
 from tensorforce.contrib.openai_gym import OpenAIGym
 
 import envs
+import csb
+import export_to_codingame_submission
+
+
+# python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
 
 
 def _restore(filename, agent):
@@ -59,7 +66,40 @@ def _restore(filename, agent):
             matching_vars[0].load(tensor_val, agent.model.session)
 
 
-# python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
+class VersusOpponent:
+    threshold_episodes_length = 1000
+
+    def __init__(self, agent, reward_threshold):
+        self.agent = agent
+        self.reward_threshold = reward_threshold
+        self.latest_rewards = []
+        self.model = None
+        self.reload()
+
+    def episode_finished(self, latest_reward):
+        self.latest_rewards.append(latest_reward)
+        if len(self.latest_rewards) < self.threshold_episodes_length:
+            return
+
+        average_reward = sum(self.latest_rewards) / len(self.latest_rewards)
+        if average_reward < self.reward_threshold:
+            del self.latest_rewards[0]
+        else:
+            print('Reloading VersusOpponent: average reward is {:.2f} over the last {} episodes'.format(
+                average_reward, self.threshold_episodes_length
+            ))
+            self.latest_rewards = []
+            self.reload()
+
+    def reload(self):
+        save_dir = './versus_saved_models/{}/model'.format(uuid.uuid4())
+        os.makedirs(os.path.dirname(save_dir))
+        self.agent.save_model(save_dir, append_timestep=False)
+        self.model = csb.Model.from_data(export_to_codingame_submission.read_weights(save_dir))
+        shutil.rmtree(os.path.dirname(save_dir))
+
+    def predict(self, state):
+        return self.model.predict(state)
 
 
 def _basename_no_ext(filename):
@@ -135,6 +175,12 @@ def main():
         logger.info("Configuration:")
         logger.info(agent)
 
+    versus_opponent = None
+    versus_opponent_update_reward_threshold = getattr(environment.gym.unwrapped, 'versus_opponent_update_reward_threshold', 0.0)
+    if versus_opponent_update_reward_threshold > 0.0:
+        versus_opponent = VersusOpponent(agent, versus_opponent_update_reward_threshold)
+        environment.gym.unwrapped.opp_solution_predict = versus_opponent.predict
+
     runner = Runner(
         agent=agent,
         environment=environment,
@@ -156,8 +202,11 @@ def main():
             ))
             logger.info("Latest episode rewards: {}".format(', '.join(map('{:.2f}'.format, r.episode_rewards[-5:]))))
             logger.info("All time best: {:0.2f}".format(max(r.episode_rewards)))
+            logger.info("1000 latest best: {:0.2f}".format(max(r.episode_rewards[-1000:])))
             logger.info("Average of last 500 rewards: {:0.2f}".format(sum(r.episode_rewards[-500:]) / min(500, len(r.episode_rewards))))
             logger.info("Average of last 100 rewards: {:0.2f}".format(sum(r.episode_rewards[-100:]) / min(100, len(r.episode_rewards))))
+        if versus_opponent:
+            versus_opponent.episode_finished(r.episode_rewards[-1])
         return True
 
     runner.run(

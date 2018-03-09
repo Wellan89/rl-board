@@ -1,3 +1,4 @@
+import copy
 import gym
 import numpy as np
 from gym.envs.classic_control import rendering
@@ -16,9 +17,13 @@ class CsbEnv(gym.Env):
     reward_range = (-np.inf, np.inf)
     spec = None
 
-    use_timed_features_mask = False
+    opp_solution_predict = None
+
     use_cp_dist_score = False
+    use_raw_rewards = False
+    use_timed_features_mask = False
     dummy_opponent_speed = 0.0
+    versus_opponent_update_reward_threshold = 0.0
 
     def __init__(self):
         self.world = World()
@@ -28,51 +33,62 @@ class CsbEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
                                                 shape=(len(self._get_state()),))
 
-    def _get_state(self):
-        state = Observation(self.world, use_timed_features_mask=self.use_timed_features_mask).to_representation()
+    def _get_state(self, opponent_view=False):
+        world = self.world
+        if opponent_view:
+            world = copy.copy(world)
+            world.pods = world.pods[2:] + world.pods[:2]
+
+        state = Observation(world, use_timed_features_mask=self.use_timed_features_mask).to_representation()
         # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
         return state
 
-    def _transform_action(self, action):
-        return action
-
-    def step(self, action):
-        # assert (len(action),) == self.action_space.shape
-        # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
-        action = self._transform_action(action)
+    def _action_to_solution(self, action):
         assert len(action) == 6
-
-        current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-        opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
-
-        agent_solution = Solution(
+        return Solution(
             move1=Move(g1=action[0], g2=action[1], g3=action[2]),
             move2=Move(g1=action[3], g2=action[4], g3=action[5]),
         )
 
+    def step(self, action):
+        # assert (len(action),) == self.action_space.shape
+        # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
+
+        current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+        opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+
+        agent_solution = self._action_to_solution(action)
+
         # Dummy solution : straight line toward the next checkpoint
-        opp_solution = Solution(
-            move1=self.world.pods[2].to_dummy_move(speed=self.dummy_opponent_speed),
-            move2=self.world.pods[3].to_dummy_move(speed=self.dummy_opponent_speed),
-        )
+        if self.versus_opponent_update_reward_threshold == 0.0:
+            opp_solution = Solution(
+                move1=self.world.pods[2].to_dummy_move(speed=self.dummy_opponent_speed),
+                move2=self.world.pods[3].to_dummy_move(speed=self.dummy_opponent_speed),
+            )
+        else:
+            opp_action = self.opp_solution_predict(self._get_state(opponent_view=True))
+            opp_solution = self._action_to_solution(opp_action)
 
         self.world.play(agent_solution, opp_solution)
 
-        if self.dummy_opponent_speed == 0.0:
+        if self.dummy_opponent_speed == 0.0 and self.versus_opponent_update_reward_threshold == 0:
             now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
             reward = now_score - current_score
             episode_over = (self.world.turn >= 400)
         else:
             if self.world.player_won(1):
                 episode_over = True
-                reward = 0.0
+                reward = 0.0 if not self.use_raw_rewards else -10.0
             elif self.world.player_won(0):
                 episode_over = True
-                reward = 20.0
+                reward = 20.0 if not self.use_raw_rewards else 10.0
             else:
-                now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-                opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
-                reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
+                if not self.use_raw_rewards:
+                    now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+                    opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+                    reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
+                else:
+                    reward = 0.0
                 episode_over = False
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
@@ -136,3 +152,11 @@ class CsbEnvD2V0(CsbEnv):
     use_cp_dist_score = True
     use_timed_features_mask = False
     dummy_opponent_speed = 0.4
+
+
+class CsbEnvVersusV0(CsbEnv):
+    use_cp_dist_score = False
+    use_raw_rewards = True
+    use_timed_features_mask = False
+    dummy_opponent_speed = 0.0
+    versus_opponent_update_reward_threshold = 2.0  # 60% of games won
