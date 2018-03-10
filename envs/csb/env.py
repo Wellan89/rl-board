@@ -55,15 +55,15 @@ class CsbEnv(gym.Env):
             )
         elif self.enable_vincent_opponent:
             self.world.interface.feed(self.world)  # OOP as intended lol
-            # move1, move2 = self.world.interface.get_moves(self.world, 1)
-            opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
-                self.world.pods[2].to_dummy_move(speed=0.2),
-                self.world.pods[3].to_dummy_move(speed=0.2),
-            )
-            # opp_solution = Solution(
-            #     move1=move1,
-            #     move2=move2,
+            move1, move2 = self.world.interface.get_moves(self.world, 1)
+            # opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
+            #     self.world.pods[2].to_dummy_move(speed=0.2),
+            #     self.world.pods[3].to_dummy_move(speed=0.2),
             # )
+            opp_solution = Solution(
+                move1=move1,
+                move2=move2,
+            )
         else:
             opp_solution = Solution(  # Empty solution : enemy doesn't move
                 move1=Move(
