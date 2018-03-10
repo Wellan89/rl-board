@@ -14,7 +14,7 @@ VIEWPORT_H = 400
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
-    reward_range = (0, MAX_EPISODE_LENGTH * 6)
+    reward_range = (-MAX_EPISODE_LENGTH, MAX_EPISODE_LENGTH)
     spec = None
 
     use_timed_features_mask = False
@@ -27,7 +27,7 @@ class CsbEnv(gym.Env):
         self.world = World()
         self.viewer = None
 
-        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(6,))
+        self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(2,))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
                                                 shape=(len(self._get_state()),))
 
@@ -43,7 +43,7 @@ class CsbEnv(gym.Env):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
         action = self._transform_action(action)
-        assert len(action) == 6
+        assert len(action) == 2
 
         current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
         opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
@@ -55,11 +55,15 @@ class CsbEnv(gym.Env):
             )
         elif self.enable_vincent_opponent:
             self.world.interface.feed(self.world)  # OOP as intended lol
-            move1, move2 = self.world.interface.get_moves(self.world, 1)
-            opp_solution = Solution(
-                move1=move1,
-                move2=move2,
+            # move1, move2 = self.world.interface.get_moves(self.world, 1)
+            opp_solution = Solution(  # Dummy solution : straight line toward the next checkpoint
+                self.world.pods[2].to_dummy_move(speed=0.2),
+                self.world.pods[3].to_dummy_move(speed=0.2),
             )
+            # opp_solution = Solution(
+            #     move1=move1,
+            #     move2=move2,
+            # )
         else:
             opp_solution = Solution(  # Empty solution : enemy doesn't move
                 move1=Move(
@@ -75,21 +79,20 @@ class CsbEnv(gym.Env):
             )
 
         if self.reward_copy_opponent:
-            # TODO : with vincent algo
-            dummy_move1 = self.world.pods[0].to_dummy_move(speed=0.2)
-            dummy_move2 = self.world.pods[1].to_dummy_move(speed=0.2)
+
+            pmove1, pmove2 = self.world.interface.get_moves(self.world, 0)
 
         self.world.play(
             Solution(
                 move1=Move(
                     g1=action[0],
                     g2=action[1],
-                    g3=action[2],
+                    g3=0.5,
                 ),
                 move2=Move(
-                    g1=action[3],
-                    g2=action[4],
-                    g3=action[5],
+                    g1=0,
+                    g2=0,
+                    g3=0.5,
                 )
             ),
             opp_solution
@@ -97,13 +100,9 @@ class CsbEnv(gym.Env):
 
         if self.reward_copy_opponent:
             reward = 1 - (
-                abs(action[0] - dummy_move1.g1) +
-                abs(action[1] - dummy_move1.g2) +
-                abs(action[2] - dummy_move1.g3) +
-                abs(action[3] - dummy_move2.g1) +
-                abs(action[4] - dummy_move2.g2) +
-                abs(action[5] - dummy_move2.g3)
-            ) / 6
+                abs(action[0] - pmove1.g1) +
+                abs(action[1] - pmove1.g2)
+            )
             episode_over = (self.world.turn >= MAX_EPISODE_LENGTH)
         else:
             if not self.enable_dummy_opponent:
@@ -186,6 +185,6 @@ class CsbEnvD1V0(CsbEnv):
 
 
 class CsbEnvSalim(CsbEnv):
-    # enable_vincent_opponent = True  # TODO : debug to enable this
-    enable_dummy_opponent = True
+    enable_vincent_opponent = True
+    # enable_dummy_opponent = True
     reward_copy_opponent = True

@@ -149,17 +149,14 @@ class Pod:
 
     def getNextCheckpoint(self, next=1):
         idx = (next + self.nextCheckpointIdx - 1)
-        lp = self.lap + idx / len(gameCsts.checkpoints)
         idx %= len(gameCsts.checkpoints)
-        if lp >= gameCsts.lapsCount and (lp != gameCsts.lapsCount or idx != 0):
-            return None
         return gameCsts.checkpoints[idx]
 
     def estimateLastCmd(self):
         F = self.state.speed / (1.0 - FRICTION_COEFF) - self.lastState.speed
         Fnorm = F.norm()
         return PodCommand(
-            target=self.lastState.pos + 10000.0 / Fnorm * F if Fnorm != 0 else self.state.pos,
+            target=self.lastState.pos + F * (10000.0 / Fnorm) if Fnorm != 0 else self.state.pos,
             thrust=clamp(Fnorm, 0.0, 200.0)
         )
 
@@ -287,11 +284,11 @@ class Pod:
 
     def read(self, x, y, vx, vy, angle, nextCheckpointIdx):
         self.lastState = self.state
-        self.x = x
-        self.y = y
-        self.vx = vx
-        self.vy = vy
-        self.angle = restoreAngle(angle)
+        self.state.pos.x = x
+        self.state.pos.y = y
+        self.state.speed.x = vx
+        self.state.speed.y = vy
+        self.state.angle = restoreAngle(angle)
 
         if nextCheckpointIdx != self.nextCheckpointIdx:
             self.checkpointsPassed += 1
