@@ -2,6 +2,7 @@ import math
 
 from envs.csb.move import Move
 from envs.csb.unit import Unit
+from envs.csb.point import Point
 from envs.csb.util import LIN, MAX_THRUST, TIMEOUT
 
 
@@ -136,7 +137,7 @@ class Pod(Unit):
         return res
 
     def get_new_power(self, gene):
-        return LIN(gene, 0.0, 0, 1.0, MAX_THRUST)
+        return LIN(gene, 0.0, 0.0, 1.0, MAX_THRUST)
 
     def apply_move(self, move):
         self.angle = self.get_new_angle(move.g1)
@@ -162,17 +163,24 @@ class Pod(Unit):
         else:
             print('{} {} {}'.format(px, py, round(power)))
 
-    def next_checkpoint(self, world, number_next):
+    def next_checkpoint(self, world, number_next=0):
         target_cpid = (self.ncpid + number_next) % world.circuit.nbcp()
         return world.circuit.cp(target_cpid)
 
     def to_dummy_move(self, speed):
         if speed == 0.0:
-            return Move(0.5, 0, 0.5)
+            return Move(0.5, 0.0, 0.5)
 
         next_cp = self.world.circuit.cp(self.ncpid)
         return Move(
-            g1=min(max(LIN(self.diffAngle(next_cp), -18.0, 0.0, 18.0, 1.0), 0), 1),
+            g1=min(max(LIN(self.diffAngle(next_cp), -18.0, 0.0, 18.0, 1.0), 0.0), 1.0),
             g2=speed,
             g3=0.5
+        )
+
+    def genes_from_vincent_command(self, command):
+        return Move(
+            g1=max(min(LIN(self.diffAngle(Point(command.target.x, command.target.y)), -18.0, 0.0, 18.0, 1.0), 1.0), 0.0),
+            g2=max(min(LIN(command.thrust, 0.0, 0.0, MAX_THRUST, 1.0), 1.0), 0.0),
+            g3=1.0 if command.shield else 0.5,
         )

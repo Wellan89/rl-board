@@ -1,4 +1,5 @@
 import copy
+
 import gym
 import numpy as np
 from gym.envs.classic_control import rendering
@@ -54,7 +55,8 @@ class CsbEnv(gym.Env):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
 
-        current_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+        best_pod = max(self.world.pods[:2], key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
+        current_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
         opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
 
         agent_solution = self._action_to_solution(action)
@@ -80,12 +82,12 @@ class CsbEnv(gym.Env):
             reward = 20.0
         else:
             if not self.use_raw_rewards:
-                now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+                now_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
                 opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
                 reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
             else:
                 reward = 0.0
-            episode_over = False
+            episode_over = False if enable_timeout else (self.world.turn > 500)
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, None

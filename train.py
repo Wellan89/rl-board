@@ -25,10 +25,11 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import time
 import uuid
 
-import shutil
+import keras
 import tensorflow as tf
 from tensorflow.python import pywrap_tensorflow
 from tensorforce import TensorForceError
@@ -44,18 +45,19 @@ import export_to_codingame_submission
 # python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
 
 
-def _restore(filename, agent):
-    tensor_codes = {
-        'dense0/W': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
-        'dense0/b': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/b',
-        'dense1/W': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/W',
-        'dense1/b': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/b',
-        'alpha/W': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/W',
-        'alpha/b': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/b',
-        'beta/W': 'trpo/actions-and-internals/beta/parameterize/beta/apply/W',
-        'beta/b': 'trpo/actions-and-internals/beta/parameterize/beta/apply/b',
-    }
+tensor_codes = {
+    'dense0/W': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
+    'dense0/b': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/b',
+    'dense1/W': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/W',
+    'dense1/b': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/b',
+    'alpha/W': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/W',
+    'alpha/b': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/b',
+    'beta/W': 'trpo/actions-and-internals/beta/parameterize/beta/apply/W',
+    'beta/b': 'trpo/actions-and-internals/beta/parameterize/beta/apply/b',
+}
 
+
+def _restore_from_tf_checkpoint(filename, agent):
     reader = pywrap_tensorflow.NewCheckpointReader(filename)
     with agent.model.graph.as_default():
         all_vars = tf.global_variables()
@@ -64,6 +66,30 @@ def _restore(filename, agent):
             assert len(matching_vars) == 1
             tensor_val = reader.get_tensor(tensor_name)
             matching_vars[0].load(tensor_val, agent.model.session)
+
+
+def _restore_from_keras_checkpoint(filename, agent):
+    tensor_values = {}
+    with tf.Graph().as_default():
+        model = keras.models.load_model(filename, compile=False)
+        for tensor_key in tensor_codes.keys():
+            layer_weights = model.get_layer(tensor_key.split('/')[0]).get_weights()
+            tensor_weights = layer_weights[0 if tensor_key.endswith('/W') else 1]
+            tensor_values[tensor_key] = tensor_weights
+
+    with agent.model.graph.as_default():
+        all_vars = tf.global_variables()
+        for tensor_key, tensor_name in tensor_codes.items():
+            matching_vars = [var for var in all_vars if var.op.name == tensor_name]
+            assert len(matching_vars) == 1
+            matching_vars[0].load(tensor_values[tensor_key], agent.model.session)
+
+
+def _restore(filename, agent):
+    if filename.endswith('.h5'):
+        _restore_from_keras_checkpoint(filename, agent)
+    else:
+        _restore_from_tf_checkpoint(filename, agent)
 
 
 class VersusOpponent:
