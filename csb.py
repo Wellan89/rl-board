@@ -112,12 +112,7 @@ class Pod:
 
     def get_new_angle(self, gene):
         res = self.angle
-        if gene < 0.25:
-            res -= 18.0
-        elif gene > 0.75:
-            res += 18.0
-        else:
-            res += LIN(gene, 0.25, -18.0, 0.75, 18.0)
+        res += LIN(gene, 0.0, -18.0, 1.0, 18.0)
 
         if res >= 360.0:
             res -= 360.0
@@ -127,12 +122,7 @@ class Pod:
         return res
 
     def get_new_power(self, gene):
-        if gene < 0.2:
-            return 0
-        elif gene > 0.8:
-            return MAX_THRUST
-        else:
-            return LIN(gene, 0.2, 0, 0.8, MAX_THRUST)
+        return LIN(gene, 0.0, 0, 1.0, MAX_THRUST)
 
     def output(self, move):
         a = self.get_new_angle(move[0]) * math.pi / 180.0

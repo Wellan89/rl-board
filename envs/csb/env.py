@@ -71,25 +71,21 @@ class CsbEnv(gym.Env):
 
         self.world.play(agent_solution, opp_solution)
 
-        if self.dummy_opponent_speed == 0.0 and self.versus_opponent_update_reward_threshold == 0:
-            now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-            reward = now_score - current_score
-            episode_over = (self.world.turn >= 400)
+        enable_timeout = (self.dummy_opponent_speed > 0.0 or self.versus_opponent_update_reward_threshold != 0.0)
+        if self.world.player_won(1, enable_timeout=enable_timeout):
+            episode_over = True
+            reward = 0.0
+        elif self.world.player_won(0, enable_timeout=enable_timeout):
+            episode_over = True
+            reward = 20.0
         else:
-            if self.world.player_won(1):
-                episode_over = True
-                reward = 0.0 if not self.use_raw_rewards else -10.0
-            elif self.world.player_won(0):
-                episode_over = True
-                reward = 20.0 if not self.use_raw_rewards else 10.0
+            if not self.use_raw_rewards:
+                now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
+                opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+                reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
             else:
-                if not self.use_raw_rewards:
-                    now_score = self.world.pods[0].score(use_cp_dist_score=self.use_cp_dist_score)
-                    opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
-                    reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
-                else:
-                    reward = 0.0
-                episode_over = False
+                reward = 0.0
+            episode_over = False
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, None
@@ -132,6 +128,11 @@ class CsbEnv(gym.Env):
                                         radius=_radius_to_screen(80)).add_attr(
                     rendering.Transform(translation=_pos_to_screen(pod))
                 )
+            self.viewer.draw_line(
+                color=color,
+                start=_pos_to_screen(pod),
+                end=_pos_to_screen(pod.next_checkpoint(self.world)),
+            )
 
         return self.viewer.render(return_rgb_array=(mode == 'rgb_array'))
 
@@ -159,4 +160,4 @@ class CsbEnvVersusV0(CsbEnv):
     use_raw_rewards = True
     use_timed_features_mask = False
     dummy_opponent_speed = 0.0
-    versus_opponent_update_reward_threshold = 2.0  # 60% of games won
+    versus_opponent_update_reward_threshold = 12.0  # 60% of games won

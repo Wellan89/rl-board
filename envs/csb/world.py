@@ -82,7 +82,7 @@ class World:
         for pod in self.pods:
             pod.end()
 
-    def player_won(self, player):
+    def player_won(self, player, enable_timeout=True):
         assert player == 0 or player == 1
 
         # Race finished
@@ -90,7 +90,14 @@ class World:
             return True
 
         # Opponent timeout
-        return self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0
+        if enable_timeout and self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0:
+            return True
+
+        if self.turn > 900:
+            print('Warning: Abnormally long game! The opponent wins')
+            return player == 1
+
+        return False
 
     def best_pod(self, player):
         if self.pods[player*2].score() > self.pods[player*2+1].score():
