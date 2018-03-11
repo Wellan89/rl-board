@@ -38,6 +38,16 @@ def _generate_episode_data(episode_id, gym_id, monitor):
         return []
 
 
+def _generate_episodes(initial_episode, n_episodes, gym_id, monitor):
+    with multiprocessing.Pool() as p:
+        episodes = p.starmap(_generate_episode_data,
+                             [(initial_episode + episode_id, gym_id, monitor) for episode_id in range(n_episodes)])
+
+    x = np.array([state for episode in episodes for state, _ in episode])
+    y = np.array([action for episode in episodes for _, action in episode])
+    return x, y
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -47,18 +57,16 @@ def main():
     args = parser.parse_args()
     args.monitor = 'supervised_data_{}'.format(args.gym_id)
 
-    with multiprocessing.Pool() as p:
-        episodes = p.starmap(_generate_episode_data,
-                             [(episode_id, args.gym_id, 'logs/{}/gym'.format(args.monitor))
-                              for episode_id in range(args.episodes)],
-                             chunksize=100)
+    batch_size = 1000
+    for i in range(0, args.episodes, batch_size):
+        save_path = 'logs/{}/data_{}.npz'.format(args.monitor, i)
+        if os.path.isfile(save_path):
+            continue
 
-    x = np.array([state for episode in episodes for state, _ in episode])
-    y = np.array([action for episode in episodes for _, action in episode])
+        x, y = _generate_episodes(i, batch_size, args.gym_id, 'logs/{}/gym'.format(args.monitor))
 
-    save_dir = 'logs/{}'.format(args.monitor)
-    os.makedirs(save_dir, exist_ok=True)
-    np.savez_compressed(save_dir + '/data.npz', x=x, y=y)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        np.savez_compressed(save_path, x=x, y=y)
 
 
 if __name__ == '__main__':

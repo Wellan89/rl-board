@@ -13,12 +13,29 @@ def _basename_no_ext(filename):
     return os.path.splitext(os.path.basename(filename))[0]
 
 
+def _read_data(gym_id):
+    x = []
+    y = []
+    supervised_data_dir = 'logs/supervised_data_{}/'.format(gym_id)
+    for i, data_file in enumerate(sorted(os.listdir(supervised_data_dir))):
+        if data_file.endswith('.npz'):
+            supervised_data_file = supervised_data_dir + data_file
+            print('Reading', supervised_data_file)
+            with np.load(supervised_data_file) as data:
+                x.append(data['x'])
+                y.append(data['y'])
+
+    x = np.concatenate(x)
+    y = np.concatenate(y)
+    return x, y
+
+
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('gym_id', help="Id of the Gym environment")
     parser.add_argument('-n', '--network', default=None, help="Network specification file")
-    parser.add_argument('--epochs', type=int, default=200, help="Number of epochs")
+    parser.add_argument('--epochs', type=int, default=100, help="Number of epochs")
     parser.add_argument('--monitor', help="Save results to this directory")
 
     args = parser.parse_args()
@@ -50,13 +67,11 @@ def main():
     network = keras.layers.Lambda(lambda x: x[1] / (x[0] + x[1]))([alpha, beta])
 
     model = keras.Model([net_input], [network])
-    model.compile(optimizer=keras.optimizers.Adam(lr=1e-3),
+    model.compile(optimizer=keras.optimizers.Adam(lr=1e-2),
                   loss='mean_squared_error')
 
-    supervised_data_path = 'logs/supervised_data_{}/data.npz'.format(args.gym_id)
-    with np.load(supervised_data_path) as data:
-        x = data['x']
-        y = data['y']
+    x, y = _read_data(args.gym_id)
+
     model.fit(x, y, batch_size=512, epochs=args.epochs, validation_split=0.1)
     os.makedirs(save_dir, exist_ok=True)
     model.save(save_dir + '/keras_model.h5')
