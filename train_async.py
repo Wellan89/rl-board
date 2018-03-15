@@ -13,25 +13,13 @@ $ python train_async.py Pong-ram-v0 -W 3 -K
 
 import argparse
 import inspect
-import json
-import logging
 import os
 import sys
-import time
 
 import tensorflow as tf
 from six.moves import shlex_quote
 
-from tensorforce import TensorForceError
-from tensorforce.agents import Agent
-from tensorforce.execution import Runner
-from tensorforce.contrib.openai_gym import OpenAIGym
-
-import envs
-
-
-def _basename_no_ext(filename):
-    return os.path.splitext(os.path.basename(filename))[0]
+import train_utils
 
 
 def main():
@@ -55,11 +43,9 @@ def main():
     parser.add_argument('--monitor', help="Save results to this directory")
     parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
     parser.add_argument('--monitor-video', type=int, default=1000, help="Save video every x steps (0 = disabled)")
+    parser.add_argument('-l', '--load', default=None, help="Load agent from a previous checkpoint")
 
     args = parser.parse_args()
-
-    if not args.monitor:
-        args.monitor = '{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.agent), _basename_no_ext(args.network))
 
     session_name = 'OpenAI-' + args.gym_id
     shell = '/bin/bash'
@@ -149,93 +135,34 @@ def main():
     cluster = {'ps': ps_hosts, 'worker': worker_hosts}
     cluster_spec = tf.train.ClusterSpec(cluster)
 
-    do_monitor = True  # (args.task_index == 0)
-    environment = OpenAIGym(
-        gym_id=args.gym_id,
-        monitor='logs/{}/gym'.format(args.monitor) if do_monitor and args.monitor else None,
-        monitor_safe=args.monitor_safe if do_monitor else None,
-        monitor_video=args.monitor_video // args.num_workers if do_monitor and args.monitor_video else None
-    )
-
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)  # log_levels[agent.log_level])
-
-    if args.agent is not None:
-        with open(args.agent, 'r') as fp:
-            agent = json.load(fp=fp)
-    else:
-        raise TensorForceError("No agent configuration provided.")
-
-    if args.network is not None:
-        with open(args.network, 'r') as fp:
-            network = json.load(fp=fp)
-    else:
-        network = None
-        logger.info("No network configuration provided.")
-
+    agent_kwargs = {}
     if args.parameter_server:
-        agent['device'] = '/job:ps/task:{}'.format(args.task_index)  # '/cpu:0'
+        agent_kwargs['device'] = '/job:ps/task:{}'.format(args.task_index)  # '/cpu:0'
     else:
-        agent['device'] = '/job:worker/task:{}'.format(args.task_index)  # '/cpu:0'
+        agent_kwargs['device'] = '/job:worker/task:{}'.format(args.task_index)  # '/cpu:0'
 
-    agent['distributed'] = dict(
+    agent_kwargs['distributed'] = dict(
         cluster_spec=cluster_spec,
         task_index=args.task_index,
         parameter_server=args.parameter_server,
         protocol='grpc'
     )
 
-    agent = Agent.from_spec(
-        spec=agent,
-        kwargs=dict(
-            states=environment.states,
-            actions=environment.actions,
-            network=network,
-            saver=dict(directory='logs/{}/checkpoints'.format(args.monitor), seconds=600),
-            summarizer=dict(directory='logs/{}/summaries'.format(args.monitor),
-                            labels=[],
-                            seconds=120)
-        )
-    )
-
-    logger.info("Starting distributed agent for OpenAI Gym '{gym_id}'".format(gym_id=args.gym_id))
-    logger.info("Config:")
-    logger.info(agent)
-
-    runner = Runner(
-        agent=agent,
-        environment=environment,
-        repeat_actions=1
-    )
-
-    if args.debug:
-        report_episodes = 1
-    else:
-        report_episodes = 100
-
-    def episode_finished(r):
-        if r.episode % report_episodes == 0:
-            steps_per_second = r.timestep / (time.time() - r.start_time)
-            logger.info("Finished episode {:d} after overall {:d} timesteps. Steps Per Second {:.2f}".format(
-                r.agent.episode,
-                r.agent.timestep,
-                steps_per_second)
-            )
-            logger.info("Latest episode rewards: {}".format(', '.join(map('{:.2f}'.format, r.episode_rewards[-5:]))))
-            logger.info("All time best: {:0.2f}".format(max(r.episode_rewards)))
-            logger.info("Average of last 500 rewards: {:.2f}".format(sum(r.episode_rewards[-500:]) / min(500, len(r.episode_rewards))))
-            logger.info("Average of last 100 rewards: {:.2f}".format(sum(r.episode_rewards[-100:]) / min(100, len(r.episode_rewards))))
-        return True
-
-    runner.run(
+    train_utils.do_train(
+        gym_id=args.gym_id,
+        do_monitor=True,   # (args.task_index == 0)
+        monitor_safe=args.monitor_safe,
+        monitor_video=args.monitor_video // args.num_workers,
+        agent_path=args.agent,
+        agent_kwargs=agent_kwargs,
+        network_path=args.network,
+        debug=args.debug,
         timesteps=args.timesteps,
         episodes=args.episodes,
         max_episode_timesteps=args.max_episode_timesteps,
         deterministic=args.deterministic,
-        episode_finished=episode_finished
+        load_path=args.load,
     )
-    runner.close()
 
 
 if __name__ == '__main__':
