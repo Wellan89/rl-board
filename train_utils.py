@@ -5,64 +5,14 @@ import shutil
 import time
 import uuid
 
-import keras
-import tensorflow as tf
-from tensorflow.python import pywrap_tensorflow
 from tensorforce import TensorForceError
 from tensorforce.agents import Agent
 from tensorforce.execution import Runner
 from tensorforce.contrib.openai_gym import OpenAIGym
 
-import envs
+import checkpoints_utils
 import csb
-import export_to_codingame_submission
-
-
-tensor_codes = {
-    'dense0/W': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
-    'dense0/b': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/b',
-    'dense1/W': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/W',
-    'dense1/b': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/b',
-    'alpha/W': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/W',
-    'alpha/b': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/b',
-    'beta/W': 'trpo/actions-and-internals/beta/parameterize/beta/apply/W',
-    'beta/b': 'trpo/actions-and-internals/beta/parameterize/beta/apply/b',
-}
-
-
-def _restore_from_tf_checkpoint(filename, agent):
-    reader = pywrap_tensorflow.NewCheckpointReader(filename)
-    with agent.model.graph.as_default():
-        all_vars = tf.global_variables()
-        for tensor_name in tensor_codes.values():
-            matching_vars = [var for var in all_vars if var.op.name == tensor_name]
-            assert len(matching_vars) == 1
-            tensor_val = reader.get_tensor(tensor_name)
-            matching_vars[0].load(tensor_val, agent.model.session)
-
-
-def _restore_from_keras_checkpoint(filename, agent):
-    tensor_values = {}
-    with tf.Graph().as_default():
-        model = keras.models.load_model(filename, compile=False)
-        for tensor_key in tensor_codes.keys():
-            layer_weights = model.get_layer(tensor_key.split('/')[0]).get_weights()
-            tensor_weights = layer_weights[0 if tensor_key.endswith('/W') else 1]
-            tensor_values[tensor_key] = tensor_weights
-
-    with agent.model.graph.as_default():
-        all_vars = tf.global_variables()
-        for tensor_key, tensor_name in tensor_codes.items():
-            matching_vars = [var for var in all_vars if var.op.name == tensor_name]
-            assert len(matching_vars) == 1
-            matching_vars[0].load(tensor_values[tensor_key], agent.model.session)
-
-
-def _restore(filename, agent):
-    if filename.endswith('.h5'):
-        _restore_from_keras_checkpoint(filename, agent)
-    else:
-        _restore_from_tf_checkpoint(filename, agent)
+import envs
 
 
 class VersusOpponent:
@@ -94,7 +44,7 @@ class VersusOpponent:
         save_dir = './versus_saved_models/{}/model'.format(uuid.uuid4())
         os.makedirs(os.path.dirname(save_dir))
         self.agent.save_model(save_dir, append_timestep=False)
-        self.model = csb.Model.from_data(export_to_codingame_submission.read_weights(save_dir))
+        self.model = csb.Model(checkpoints_utils.read_weights(save_dir))
         shutil.rmtree(os.path.dirname(save_dir))
 
     def predict(self, state):
@@ -110,7 +60,7 @@ def _avg(s):
 
 
 def do_train(gym_id, do_monitor, monitor_safe, monitor_video, agent_path, agent_kwargs, network_path,
-             debug, timesteps, episodes, max_episode_timesteps, deterministic, load_path):
+             debug, timesteps, episodes, max_episode_timesteps, deterministic, load_path, task_index):
 
     monitor = '{}_{}_{}'.format(gym_id, _basename_no_ext(agent_path), _basename_no_ext(network_path))
     if deterministic:
@@ -125,7 +75,7 @@ def do_train(gym_id, do_monitor, monitor_safe, monitor_video, agent_path, agent_
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)  # log_levels[agent.log_level])
+    logger.setLevel(logging.INFO)
 
     if agent_path is not None:
         with open(agent_path, 'r') as fp:
@@ -155,16 +105,12 @@ def do_train(gym_id, do_monitor, monitor_safe, monitor_video, agent_path, agent_
     )
 
     logger.info("Starting agent for OpenAI Gym '{gym_id}'".format(gym_id=gym_id))
-    logger.info("Config:")
-    logger.info(agent)
-
-    if load_path:
-        _restore(load_path, agent)
-
     if debug:
-        logger.info("-" * 16)
         logger.info("Configuration:")
         logger.info(agent)
+
+    if load_path:
+        checkpoints_utils.restore_agent(load_path, agent, task_index)
 
     versus_opponent = None
     versus_opponent_update_reward_threshold = getattr(environment.gym.unwrapped, 'versus_opponent_update_reward_threshold', 0.0)

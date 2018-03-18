@@ -98,6 +98,9 @@ def main():
                 cmd_args.append('--parameter-server')
             if args.debug:
                 cmd_args.append('--debug')
+            if args.load:
+                cmd_args.append('--load')
+                cmd_args.append(args.load)
             return cmd_args
 
         if args.mode == 'tmux':
@@ -152,7 +155,7 @@ def main():
         gym_id=args.gym_id,
         do_monitor=True,   # (args.task_index == 0)
         monitor_safe=args.monitor_safe,
-        monitor_video=args.monitor_video // args.num_workers,
+        monitor_video=args.monitor_video,
         agent_path=args.agent,
         agent_kwargs=agent_kwargs,
         network_path=args.network,
@@ -162,6 +165,7 @@ def main():
         max_episode_timesteps=args.max_episode_timesteps,
         deterministic=args.deterministic,
         load_path=args.load,
+        task_index=args.task_index,
     )
 
 

@@ -24,11 +24,11 @@ class Model:
 
     @classmethod
     def from_data(cls, model_data):
-        weights = {}
-        for var, (shape, data) in model_data.items():
-            weights[var] = np.reshape(
+        weights = {
+            var: np.reshape(
                 np.fromstring(base64.decodebytes(data.encode()), dtype=np.float16).astype(np.float32), shape
-            )
+            ) for var, (shape, data) in model_data.items()
+        }
         return cls(weights=weights)
 
     def predict(self, state):

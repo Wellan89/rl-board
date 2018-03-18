@@ -38,6 +38,7 @@ def main():
         max_episode_timesteps=args.max_episode_timesteps,
         deterministic=args.deterministic,
         load_path=args.load,
+        task_index=None,
     )
 
 
