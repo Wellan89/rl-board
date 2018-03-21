@@ -56,7 +56,7 @@ def read_weights(filename):
 
 
 def restore_agent(filename, agent, task_index):
-    print('Restoring from: ', filename)
+    print('Restoring from:', filename)
     tensor_values = read_weights(filename)
 
     with agent.model.graph.as_default():

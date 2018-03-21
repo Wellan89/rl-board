@@ -153,7 +153,7 @@ def main():
 
     train_utils.do_train(
         gym_id=args.gym_id,
-        do_monitor=True,   # (args.task_index == 0)
+        do_monitor=(args.task_index == 0),
         monitor_safe=args.monitor_safe,
         monitor_video=args.monitor_video,
         agent_path=args.agent,

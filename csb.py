@@ -144,7 +144,7 @@ class GameState:
     def __init__(self, laps, checkpoints):
         self.laps = laps
         self.checkpoints = checkpoints
-        self.pods = [Pod() for _ in range (4)]
+        self.pods = [Pod() for _ in range(4)]
 
     @classmethod
     def read_initial(cls):
@@ -178,11 +178,16 @@ class GameState:
                     cp.y / 1000,
                 ]
         for i in range(6):
-            cp = self.checkpoints[i] if i < len(self.checkpoints) else Point(0.0, 0.0)
-            features += [
-                cp.x / 1000,
-                cp.y / 1000,
-            ]
+            if i < len(self.checkpoints):
+                features += [
+                    self.checkpoints[i].x / 1000,
+                    self.checkpoints[i].y / 1000,
+                ]
+            else:
+                features += [
+                    0.0,
+                    0.0,
+                ]
         return features
 
 

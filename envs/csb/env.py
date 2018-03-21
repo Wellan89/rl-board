@@ -4,10 +4,10 @@ import gym
 import numpy as np
 from gym.envs.classic_control import rendering
 
+from envs.csb import observation
 from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
-from envs.csb.observation import Observation
 
 VIEWPORT_W = 710
 VIEWPORT_H = 400
@@ -35,12 +35,12 @@ class CsbEnv(gym.Env):
                                                 shape=(len(self._get_state()),))
 
     def _get_state(self, opponent_view=False):
-        world = self.world
         if opponent_view:
-            world = copy.copy(world)
-            world.pods = world.pods[2:] + world.pods[:2]
+            pods = self.world.pods[2:] + self.world.pods[:2]
+        else:
+            pods = self.world.pods
 
-        state = Observation(world, use_timed_features_mask=self.use_timed_features_mask).to_representation()
+        state = observation.observation(self.world, pods, use_timed_features_mask=self.use_timed_features_mask)
         # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
         return state
 
