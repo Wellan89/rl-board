@@ -59,7 +59,7 @@ class Action:
         self.action = list(action)
 
     def output(self):
-        for i in range(2):
+        for i in [1, 0]:
             self.game_state.pods[i].output(self.action[3*i:3*(i+1)])
 
 
@@ -85,9 +85,9 @@ class Pod:
     def read_turn(self):
         x, y, vx, vy, angle, next_check_point_id = map(int, input().split())
 
-        if (self.next_check_point_id != next_check_point_id):
+        if self.next_check_point_id != next_check_point_id:
             self.timeout = TIMEOUT
-            if (next_check_point_id == 1):
+            if next_check_point_id == 0:
                 self.lap += 1
 
         self.x = x
@@ -154,7 +154,7 @@ class GameState:
         return cls(laps, checkpoints)
 
     def read_turn(self):
-        for pod in self.pods:
+        for pod in [self.pods[1], self.pods[0], self.pods[3], self.pods[2]]:
             pod.read_turn()
 
     def extract_state(self):
