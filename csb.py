@@ -23,6 +23,8 @@ def _matmul(a, b):
 
 
 class Model:
+    deterministic = True
+
     def __init__(self, weights):
         self.weights = weights
 
@@ -47,10 +49,12 @@ class Model:
         beta = _matmul(layer, self.weights['beta/W']) + self.weights['beta/b']
         beta = np.log(np.exp(np.clip(beta, log_eps, -log_eps)) + 1.0) + 1.0
 
-        alpha_beta = np.maximum(alpha + beta, 1e-6)
-        definite = beta / alpha_beta
+        if not self.deterministic:
+            alpha = np.random.gamma(alpha)
+            beta = np.random.gamma(beta)
 
-        return definite
+        action = beta / np.maximum(alpha + beta, 1e-6)
+        return action
 
     def compute_action(self, game_state):
         action = self.predict(game_state.extract_state())

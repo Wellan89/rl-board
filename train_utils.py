@@ -16,7 +16,7 @@ import envs
 
 
 class VersusOpponent:
-    threshold_episodes_length = 1000
+    threshold_episodes_length = 5000
 
     def __init__(self, agent, reward_threshold):
         self.agent = agent

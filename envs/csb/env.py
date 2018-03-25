@@ -1,5 +1,3 @@
-import copy
-
 import gym
 import numpy as np
 from gym.envs.classic_control import rendering
@@ -22,6 +20,7 @@ class CsbEnv(gym.Env):
 
     use_cp_dist_score = False
     use_raw_rewards = False
+    use_negative_rewards = False
     use_timed_features_mask = False
     dummy_opponent_speed = 0.0
     versus_opponent_update_reward_threshold = 0.0
@@ -76,10 +75,10 @@ class CsbEnv(gym.Env):
         enable_timeout = (self.dummy_opponent_speed > 0.0 or self.versus_opponent_update_reward_threshold != 0.0)
         if self.world.player_won(1, enable_timeout=enable_timeout):
             episode_over = True
-            reward = 0.0
+            reward = 0.0 if not self.use_negative_rewards else -10.0
         elif self.world.player_won(0, enable_timeout=enable_timeout):
             episode_over = True
-            reward = 20.0
+            reward = 20.0 if not self.use_negative_rewards else 10.0
         else:
             if not self.use_raw_rewards:
                 now_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
@@ -147,19 +146,17 @@ class CsbEnvD0V0(CsbEnv):
 
 class CsbEnvD1V0(CsbEnv):
     use_cp_dist_score = True
-    use_timed_features_mask = False
     dummy_opponent_speed = 0.1
 
 
 class CsbEnvD2V0(CsbEnv):
     use_cp_dist_score = True
-    use_timed_features_mask = False
     dummy_opponent_speed = 0.4
 
 
 class CsbEnvVersusV0(CsbEnv):
     use_cp_dist_score = False
     use_raw_rewards = True
-    use_timed_features_mask = False
+    use_negative_rewards = True
     dummy_opponent_speed = 0.0
-    versus_opponent_update_reward_threshold = 12.0  # 60% of games won
+    versus_opponent_update_reward_threshold = 2.0  # 60% of games won
