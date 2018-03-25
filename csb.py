@@ -18,6 +18,10 @@ NBPOD = 4
 TIMEOUT = 100
 
 
+def _matmul(a, b):
+    return np.einsum('i,ij->j', a, b)
+
+
 class Model:
     def __init__(self, weights):
         self.weights = weights
@@ -32,21 +36,21 @@ class Model:
         return cls(weights=weights)
 
     def predict(self, state):
-        layer = np.array([state], dtype=np.float32)
-        layer = np.tanh(np.matmul(layer, self.weights['dense0/W']) + self.weights['dense0/b'])
-        layer = np.tanh(np.matmul(layer, self.weights['dense1/W']) + self.weights['dense1/b'])
+        layer = np.array(state, dtype=np.float32)
+        layer = np.tanh(_matmul(layer, self.weights['dense0/W']) + self.weights['dense0/b'])
+        layer = np.tanh(_matmul(layer, self.weights['dense1/W']) + self.weights['dense1/b'])
 
         log_eps = math.log(1e-6)
-        alpha = np.matmul(layer, self.weights['alpha/W']) + self.weights['alpha/b']
+        alpha = _matmul(layer, self.weights['alpha/W']) + self.weights['alpha/b']
         alpha = np.log(np.exp(np.clip(alpha, log_eps, -log_eps)) + 1.0) + 1.0
 
-        beta = np.matmul(layer, self.weights['beta/W']) + self.weights['beta/b']
+        beta = _matmul(layer, self.weights['beta/W']) + self.weights['beta/b']
         beta = np.log(np.exp(np.clip(beta, log_eps, -log_eps)) + 1.0) + 1.0
 
         alpha_beta = np.maximum(alpha + beta, 1e-6)
         definite = beta / alpha_beta
 
-        return definite[0]
+        return definite
 
     def compute_action(self, game_state):
         action = self.predict(game_state.extract_state())

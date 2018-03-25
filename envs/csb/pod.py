@@ -18,12 +18,6 @@ class Pod(Unit):
         self.world = world
         self.boost_available = True
 
-    def compare(self, pod):
-        return not (
-            abs(self.x - pod.x) > 1 or abs(self.y - pod.y) > 1 or
-            abs(self.vx - pod.vx) > 1 or abs(self.vy - pod.vy) > 1 or self.ncpid != pod.ncpid
-        )
-
     def incrcpid(self):
         self.ncpid += 1
         if self.ncpid == 1:
@@ -38,13 +32,13 @@ class Pod(Unit):
         return self.lap * self.world.circuit.nbcp() + lastCP
 
     def score(self, use_cp_dist_score=False):
+        if not use_cp_dist_score:
+            return self.nbChecked()
+
         current_cp = self.world.circuit.cp((self.ncpid - 1) % self.world.circuit.nbcp())
         next_cp = self.world.circuit.cp(self.ncpid)
         distance_cp_to_ncp = current_cp.distance(next_cp)
-        if use_cp_dist_score:
-            cp_dist_score = (distance_cp_to_ncp - self.distance(self.world.circuit.cp(self.ncpid))) / distance_cp_to_ncp
-        else:
-            cp_dist_score = 0.0
+        cp_dist_score = (distance_cp_to_ncp - self.distance(next_cp)) / distance_cp_to_ncp
         return self.nbChecked() + cp_dist_score
 
     def getAngle(self, p):
