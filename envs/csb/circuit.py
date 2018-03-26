@@ -35,6 +35,8 @@ class Circuit:
             )
             for i, point in enumerate(random.choice(BASE_CONFIGURATIONS))
         ]
+        offset = random.randrange(0, len(self.cps))
+        self.cps = [self.cps[(i + offset) % len(self.cps)] for i in range(len(self.cps))]
 
     def nbcp(self):
         return len(self.cps)
