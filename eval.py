@@ -41,6 +41,15 @@ class _MappedGenerateEpisodeData:
         return _generate_episode_data(episode_id, self.gym_id, self.model, self.monitor)
 
 
+def compute_rewards(gym_id, model_path, episodes, monitor=None, processes=None):
+    with multiprocessing.Pool(processes=processes) as p:
+        rewards = p.map(_MappedGenerateEpisodeData(gym_id=gym_id,
+                                                   model=csb.Model(checkpoints_utils.read_weights(model_path)),
+                                                   monitor=monitor),
+                        range(episodes))
+    return rewards
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -50,11 +59,8 @@ def main():
 
     args = parser.parse_args()
 
-    with multiprocessing.Pool() as p:
-        rewards = p.map(_MappedGenerateEpisodeData(gym_id=args.gym_id,
-                                                   model=csb.Model(checkpoints_utils.read_weights(args.load)),
-                                                   monitor='logs/eval_{}'.format(args.gym_id)),
-                        range(args.episodes))
+    rewards = compute_rewards(gym_id=args.gym_id, model_path=args.load, episodes=args.episodes,
+                              monitor='logs/eval_{}'.format(args.gym_id))
 
     print('Rewards statistics:')
     desc = stats.describe(rewards)
