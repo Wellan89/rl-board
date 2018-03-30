@@ -7,9 +7,10 @@ from envs.csb import util
 __IMPORT_TIME__ = time.time()
 
 
-def observation(world, pods, use_timed_features_mask=False):
+def observation(world, pods, use_timed_features_mask=False, use_complex_features_mask=False):
     hard_features_mask = min((time.time() - __IMPORT_TIME__) / (3600 * 2), 1.0) if use_timed_features_mask else 1.0
-    features = [world.circuit.nbcp() * world.nblaps * hard_features_mask]
+    complex_features_mask = 0.0 if use_complex_features_mask else 1.0
+    features = [world.circuit.nbcp() * world.nblaps * hard_features_mask * complex_features_mask]
     for pod in pods:
         pod_features_mask = hard_features_mask if pod.id != 0 else 1.0
         features += [
@@ -21,9 +22,9 @@ def observation(world, pods, use_timed_features_mask=False):
         ]
         features += [
             float(pod.boost_available) * hard_features_mask,
-            pod.timeout / util.TIMEOUT * hard_features_mask,
+            pod.timeout / util.TIMEOUT * hard_features_mask * complex_features_mask,
             pod.shield / 4.0 * hard_features_mask,
-            pod.nbChecked() * hard_features_mask,
+            pod.nbChecked() * hard_features_mask * complex_features_mask,
         ]
         for i in range(3):
             cp = pod.next_checkpoint(world, i)
@@ -36,8 +37,8 @@ def observation(world, pods, use_timed_features_mask=False):
         if i < world.circuit.nbcp():
             cp = world.circuit.cp(i)
             features += [
-                cp.x / 1000.0 * hard_features_mask,
-                cp.y / 1000.0 * hard_features_mask,
+                cp.x / 1000.0 * hard_features_mask * complex_features_mask,
+                cp.y / 1000.0 * hard_features_mask * complex_features_mask,
             ]
         else:
             features += [

@@ -22,6 +22,7 @@ class CsbEnv(gym.Env):
     use_raw_rewards = False
     use_negative_rewards = False
     use_timed_features_mask = False
+    use_complex_features_mask = False
     dummy_opponent_speed = 0.0
     versus_opponent_update_reward_threshold = 0.0
 
@@ -39,7 +40,9 @@ class CsbEnv(gym.Env):
         else:
             pods = self.world.pods
 
-        state = observation.observation(self.world, pods, use_timed_features_mask=self.use_timed_features_mask)
+        state = observation.observation(self.world, pods,
+                                        use_timed_features_mask=self.use_timed_features_mask,
+                                        use_complex_features_mask=self.use_complex_features_mask)
         # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
         return state
 
@@ -151,6 +154,12 @@ class CsbEnvD1V0(CsbEnv):
 
 class CsbEnvD2V0(CsbEnv):
     use_cp_dist_score = True
+    dummy_opponent_speed = 0.4
+
+
+class CsbEnvD3V0(CsbEnv):
+    use_cp_dist_score = True
+    use_complex_features_mask = True
     dummy_opponent_speed = 0.4
 
 
