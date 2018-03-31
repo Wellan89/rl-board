@@ -22,7 +22,7 @@ public:
         for (int i = 0; i < this->map.size(); ++i) {
             this->map[i].resize(MAXIMUM_MAP_SIZE);
             for (int j = 0; j < this->map[i].size(); ++j) {
-                this->map[i][j] = 4;
+                this->map[i][j] = FINAL_HEIGHT;
             }
         }
 
@@ -115,7 +115,7 @@ public:
 
     int get(int x, int y) const {
         if (x < 0 || y < 0 || x >= this->map.size() || y >= this->map.size()) {
-            return 4;
+            return FINAL_HEIGHT;
         }
         return this->map[x][y];
     }
