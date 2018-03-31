@@ -163,6 +163,14 @@ class CsbEnvD3V0(CsbEnv):
     dummy_opponent_speed = 0.4
 
 
+class CsbEnvD4V0(CsbEnv):
+    use_cp_dist_score = False
+    use_raw_rewards = True
+    use_negative_rewards = True
+    use_complex_features_mask = True
+    dummy_opponent_speed = 0.4
+
+
 class CsbEnvVersusV0(CsbEnv):
     use_cp_dist_score = False
     use_raw_rewards = True
