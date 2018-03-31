@@ -24,6 +24,8 @@ def _replace_basename(tensor_name, replacement):
 def _read_weights_from_tf_checkpoint(filename):
     if os.path.isdir(filename):
         filename = tf.train.latest_checkpoint(filename)
+
+    print('Reading weights from:', filename)
     reader = pywrap_tensorflow.NewCheckpointReader(filename)
 
     weights = {}
@@ -38,6 +40,7 @@ def _read_weights_from_tf_checkpoint(filename):
 def _read_weights_from_keras(filename):
     tensor_values = {}
     with tf.Graph().as_default():
+        print('Reading weights from:', filename)
         model = keras.models.load_model(filename, compile=False)
         for tensor_key in TENSOR_CODES.keys():
             layer_weights = model.get_layer(tensor_key.split('/')[0]).get_weights()
@@ -47,7 +50,6 @@ def _read_weights_from_keras(filename):
 
 
 def read_weights(filename):
-    print('Reading weights from:', filename)
     if filename.endswith('.h5'):
         weights = _read_weights_from_keras(filename)
     else:
@@ -56,7 +58,7 @@ def read_weights(filename):
 
 
 def restore_agent(filename, agent, task_index):
-    print('Restoring from:', filename)
+    print('Restoring agent from:', filename)
     tensor_values = read_weights(filename)
 
     with agent.model.graph.as_default():

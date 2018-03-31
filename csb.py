@@ -166,7 +166,8 @@ class GameState:
             pod.read_turn()
 
     def extract_state(self):
-        features = [len(self.checkpoints) * self.laps]
+        complex_features_mask = 0.0
+        features = [len(self.checkpoints) * self.laps * complex_features_mask]
         for pod in self.pods:
             features += [
                 pod.x / 1000,
@@ -175,9 +176,9 @@ class GameState:
                 pod.vy / 1000,
                 pod.angle / 360,
                 float(pod.boost_available),
-                pod.timeout / TIMEOUT,
+                pod.timeout / TIMEOUT * complex_features_mask,
                 pod.shield / 4,
-                pod.nb_checked(self),
+                pod.nb_checked(self) * complex_features_mask,
             ]
             for i in range(3):
                 cp = pod.next_checkpoint(self, i)
@@ -188,8 +189,8 @@ class GameState:
         for i in range(6):
             if i < len(self.checkpoints):
                 features += [
-                    self.checkpoints[i].x / 1000,
-                    self.checkpoints[i].y / 1000,
+                    self.checkpoints[i].x / 1000 * complex_features_mask,
+                    self.checkpoints[i].y / 1000 * complex_features_mask,
                 ]
             else:
                 features += [
