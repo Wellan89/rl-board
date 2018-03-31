@@ -105,3 +105,4 @@ ENV/
 logs/
 submissions/
 versus_saved_models/
+*.ipynb

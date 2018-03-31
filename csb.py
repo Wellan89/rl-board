@@ -23,10 +23,9 @@ def _matmul(a, b):
 
 
 class Model:
-    deterministic = True
-
-    def __init__(self, weights):
+    def __init__(self, weights, deterministic=True):
         self.weights = weights
+        self.deterministic = deterministic
 
     @classmethod
     def from_data(cls, model_data):

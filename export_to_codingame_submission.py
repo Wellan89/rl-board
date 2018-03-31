@@ -21,7 +21,7 @@ def main():
 
     os.makedirs('./submissions', exist_ok=True)
     with open('./submissions/csb.json', 'w') as f:
-        json.dump(weights, f)
+        f.write(json.dumps(weights) + '\n')
 
 
 if __name__ == '__main__':

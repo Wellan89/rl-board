@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import os
@@ -136,8 +137,8 @@ def do_train(gym_id, do_monitor, monitor_safe, monitor_video, agent_path, agent_
     def episode_finished(r):
         if r.episode % report_episodes == 0:
             steps_per_second = r.timestep / (time.time() - r.start_time)
-            logger.info("Finished episode {:d} after {:d} timesteps. Steps Per Second {:0.2f}".format(
-                r.agent.episode, r.episode_timestep, steps_per_second
+            logger.info("{} - Finished episode {:d} after {:d} timesteps. Steps Per Second {:0.2f}".format(
+                datetime.datetime.now(), r.agent.episode, r.episode_timestep, steps_per_second
             ))
             logger.info("Latest episode rewards: {}".format(', '.join(map('{:.2f}'.format, r.episode_rewards[-5:]))))
             logger.info("All time best: {:0.2f}".format(max(r.episode_rewards)))

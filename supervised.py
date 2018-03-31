@@ -48,6 +48,27 @@ def _read_data(supervised_data_dir):
     return x, y
 
 
+def _softplus_layer(x):
+    # Tensorflow, tensorforce and math needs to be imported here so that the saved model can be loaded again
+    import math
+    import tensorflow as tf
+    from tensorforce import util
+    log_eps = math.log(util.epsilon)
+    x = tf.clip_by_value(t=x, clip_value_min=log_eps, clip_value_max=-log_eps)
+    x = tf.log(x=(tf.exp(x=x) + 1.0)) + 1.0
+    return x
+
+
+def _entropy_layer(x):
+    # Tensorflow needs to be imported here so that the saved model can be loaded again
+    import tensorflow as tf
+    alpha, beta, alpha_beta = x
+    log_norm = tf.lgamma(x=alpha) + tf.lgamma(x=beta) - tf.lgamma(x=alpha_beta)
+    entropy = log_norm - (beta - 1.0) * tf.digamma(x=beta) - (alpha - 1.0) * tf.digamma(x=alpha) \
+        + (alpha_beta - 2.0) * tf.digamma(x=alpha_beta)
+    return tf.reduce_mean(entropy)
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -58,6 +79,7 @@ def main():
     parser.add_argument('--data-dir', default=None, help="Directory containing the supervised training data")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--loss', default='mean_absolute_error', help="Loss")
+    parser.add_argument('--entropy-loss-weight', type=float, default=0.05, help="Entropy loss weight")
 
     args = parser.parse_args()
 
@@ -77,26 +99,39 @@ def main():
     network = net_input
     for i, layer in enumerate(network_def):
         assert layer['type'] == 'dense'
-        network = keras.layers.Dense(units=layer['size'], activation=layer['activation'], name='dense{}'.format(i))(network)
+        network = keras.layers.Dense(units=layer['size'], activation=layer['activation'],
+                                     name='dense{}'.format(i))(network)
 
     alpha = keras.layers.Dense(units=environment.actions['shape'][0], name='alpha')(network)
-    alpha = keras.layers.Activation('softplus')(alpha)
-    alpha = keras.layers.Lambda(lambda x: x + 1)(alpha)
+    alpha = keras.layers.Lambda(_softplus_layer)(alpha)
 
     beta = keras.layers.Dense(units=environment.actions['shape'][0], name='beta')(network)
-    beta = keras.layers.Activation('softplus')(beta)
-    beta = keras.layers.Lambda(lambda x: x + 1)(beta)
+    beta = keras.layers.Lambda(_softplus_layer)(beta)
 
-    network = keras.layers.Lambda(lambda x: x[1] / (x[0] + x[1]))([alpha, beta])
+    alpha_beta = keras.layers.add([alpha, beta])
+    action = keras.layers.Lambda(lambda x: x[0] / x[1], name='action')([beta, alpha_beta])
 
-    model = keras.Model([net_input], [network])
-    model.compile(optimizer=keras.optimizers.Adam(lr=args.lr), loss=args.loss)
+    outputs = [action]
+    loss_weights = {'action': 1.0}
+    loss = {'action': args.loss}
+
+    if args.entropy_loss_weight:
+        entropy = keras.layers.Lambda(_entropy_layer, name='entropy')([alpha, beta, alpha_beta])
+        outputs.append(entropy)
+        loss_weights['entropy'] = args.entropy_loss_weight
+        loss['entropy'] = lambda y_true, y_pred: y_pred
+
+    model = keras.Model([net_input], outputs)
+    model.compile(optimizer=keras.optimizers.Adam(lr=args.lr), loss_weights=loss_weights, loss=loss)
 
     x, y = _read_data(args.data_dir)
+    if args.entropy_loss_weight:
+        y = [y, np.zeros(shape=y.shape[0])]
 
-    model.fit(x, y, batch_size=512, epochs=args.epochs, validation_split=0.1)
+    model_name = 'keras_model_loss={}_lr={}_entropy={}.h5'.format(args.loss, args.lr, args.entropy_loss_weight)
     os.makedirs(save_dir, exist_ok=True)
-    model.save(save_dir + '/keras_model.h5')
+    model.fit(x, y, batch_size=512, epochs=args.epochs, validation_split=0.1,
+              callbacks=[keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name), save_best_only=True)])
 
 
 if __name__ == '__main__':

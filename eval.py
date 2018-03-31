@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import math
 import multiprocessing
 
@@ -41,13 +42,10 @@ class _MappedGenerateEpisodeData:
         return _generate_episode_data(episode_id, self.gym_id, self.model, self.monitor)
 
 
-def compute_rewards(gym_id, model_path, episodes, monitor=None, processes=None):
+def _compute_rewards(gym_id, model_path, episodes, monitor, processes, deterministic):
     with multiprocessing.Pool(processes=processes) as p:
-        rewards = p.map(_MappedGenerateEpisodeData(gym_id=gym_id,
-                                                   model=csb.Model(checkpoints_utils.read_weights(model_path)),
-                                                   monitor=monitor),
-                        range(episodes))
-    return rewards
+        model = csb.Model(checkpoints_utils.read_weights(model_path), deterministic=deterministic)
+        return p.map(_MappedGenerateEpisodeData(gym_id=gym_id, model=model, monitor=monitor), range(episodes))
 
 
 def main():
@@ -55,17 +53,29 @@ def main():
 
     parser.add_argument('gym_id', help="Id of the Gym environment")
     parser.add_argument('-e', '--episodes', type=int, default=2000, help="Number of episodes")
-    parser.add_argument('-l', '--load', default=None, help="Load agent from a previous checkpoint")
+    parser.add_argument('-l', '--load', help="Load agent from a previous checkpoint")
+    parser.add_argument('-p', '--processes', type=int, default=None, help="Number of processes")
+    parser.add_argument('-d', '--deterministic', type=int, default=1, help="Whether actions are chosen deterministically")
+    parser.add_argument('-m', '--monitor', type=int, default=0, help="Whether to keep evaluating")
 
     args = parser.parse_args()
 
-    rewards = compute_rewards(gym_id=args.gym_id, model_path=args.load, episodes=args.episodes,
-                              monitor='logs/eval_{}'.format(args.gym_id))
+    monitor = 'logs/eval_{}_{}'.format(args.gym_id, 'deterministic' if args.deterministic else 'random')
+    eval_idx = 0
+    while True:
+        eval_idx += 1
+        print('{} - Evaluation {}:'.format(datetime.datetime.now(), eval_idx))
+        rewards = _compute_rewards(gym_id=args.gym_id, model_path=args.load, episodes=args.episodes,
+                                   monitor=monitor, processes=args.processes, deterministic=bool(args.deterministic))
 
-    print('Rewards statistics:')
-    desc = stats.describe(rewards)
-    print(desc)
-    print('95% confidence interval:', stats.norm.interval(0.95, loc=desc.mean, scale=math.sqrt(desc.variance / desc.nobs)))
+        print('Rewards statistics:')
+        desc = stats.describe(rewards)
+        print(desc)
+        print('95% confidence interval:', stats.norm.interval(0.95, loc=desc.mean, scale=math.sqrt(desc.variance / desc.nobs)))
+        print('\n')
+
+        if not args.monitor:
+            break
 
 
 if __name__ == '__main__':
