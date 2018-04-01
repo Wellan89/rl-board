@@ -7,8 +7,9 @@ from envs.csb.pod import Pod
 
 class World:
 
+    __slots__ = ('pods', 'circuit', 'nblaps', 'turn')
+
     def __init__(self):
-        self.pods = [None] * 4
         self.circuit = Circuit()
         self.nblaps = 3
         self.turn = 0
@@ -19,14 +20,16 @@ class World:
         angle = math.pi / 2 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
         cos_angle = math.cos(angle)
         sin_angle = math.sin(angle)
-        self.pods[0] = Pod(0, cp0x + cos_angle * distance_to_center,
-                           cp0y + sin_angle * distance_to_center, self)
-        self.pods[1] = Pod(1, cp0x - cos_angle * distance_to_center,
-                           cp0y - sin_angle * distance_to_center, self)
-        self.pods[2] = Pod(2, cp0x + cos_angle * (2000 - distance_to_center),
-                           cp0y + sin_angle * (2000 - distance_to_center), self)
-        self.pods[3] = Pod(3, cp0x - cos_angle * (2000 - distance_to_center),
-                           cp0y - sin_angle * (2000 - distance_to_center), self)
+        self.pods = [
+            Pod(0, cp0x + cos_angle * distance_to_center,
+                cp0y + sin_angle * distance_to_center, self),
+            Pod(1, cp0x - cos_angle * distance_to_center,
+                cp0y - sin_angle * distance_to_center, self),
+            Pod(2, cp0x + cos_angle * (2000 - distance_to_center),
+                cp0y + sin_angle * (2000 - distance_to_center), self),
+            Pod(3, cp0x - cos_angle * (2000 - distance_to_center),
+                cp0y - sin_angle * (2000 - distance_to_center), self),
+        ]
         for pod in self.pods:
             pod.angle = angle - math.pi / 2
 

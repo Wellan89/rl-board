@@ -34,17 +34,20 @@ class CsbEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
                                                 shape=(len(self._get_state()),))
 
-    def _get_state(self, opponent_view=False):
+    def compute_custom_state(self, world, opponent_view=False):
         if opponent_view:
-            pods = self.world.pods[2:] + self.world.pods[:2]
+            pods = world.pods[2:] + world.pods[:2]
         else:
-            pods = self.world.pods
+            pods = world.pods
 
-        state = observation.observation(self.world, pods,
+        state = observation.observation(world, pods,
                                         use_timed_features_mask=self.use_timed_features_mask,
                                         use_complex_features_mask=self.use_complex_features_mask)
         # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
         return state
+
+    def _get_state(self, opponent_view=False):
+        return self.compute_custom_state(self.world, opponent_view=opponent_view)
 
     def _action_to_solution(self, action):
         assert len(action) == 6

@@ -5,6 +5,8 @@ import math
 
 class Unit(Point):
 
+    __slots__ = ('id', 'r', 'vx', 'vy')
+
     def __init__(self, id, x, y, r, vx, vy):
         super().__init__(x, y)
         self.id = id

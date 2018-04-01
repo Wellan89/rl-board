@@ -5,47 +5,95 @@ import os
 import keras
 import numpy as np
 from tensorforce.contrib.openai_gym import OpenAIGym
+from tqdm import tqdm
 
 import envs
+from envs.csb.checkpoint import Checkpoint
+from envs.csb.world import World
 
 
 def _basename_no_ext(filename):
     return os.path.splitext(os.path.basename(filename))[0]
 
 
-def _read_data(supervised_data_dir):
+def _read_np_episodes(data_file):
+    with np.load(data_file) as data:
+        return data['x'], data['y']
+
+
+def _read_txt_episode(data_file, env):
+    x = []
+    y = []
+    with open(data_file) as f:
+        world = World()
+        world.nblaps, checkpoints_count = map(int, f.readline().split())
+        world.circuit.cps = []
+        for i in range(checkpoints_count):
+            cp_x, cp_y = map(int, f.readline().split())
+            world.circuit.cps.append(Checkpoint(i, cp_x, cp_y))
+
+        turn_idx = 0
+        while True:
+            new_turn_idx = int(f.readline())
+            if new_turn_idx <= turn_idx:
+                # End of the game
+                break
+            turn_idx = new_turn_idx
+
+            for p in world.pods:
+                p.x, p.y, p.vx, p.vy, p.angle, p.ncpid, p.lap, p.timeout, p.shield, p.boost_available = \
+                    map(float, f.readline().split())
+                p.ncpid = int(p.ncpid)
+
+            f.readline()  # skip evaluations
+
+            actions = [list(map(float, f.readline().split())) for _ in range(2)]
+            x.append(env.compute_custom_state(world, opponent_view=False))
+            y.append(actions[0])
+            x.append(env.compute_custom_state(world, opponent_view=True))
+            y.append(actions[1])
+
+    return np.array(x, dtype=np.float32), np.array(y, dtype=np.float32)
+
+
+def _do_read_data(supervised_data_dir, extension, read_episode_func):
     data_files = [os.path.join(supervised_data_dir, data_file)
                   for data_file in sorted(os.listdir(supervised_data_dir))
-                  if data_file.endswith('.npz')]
+                  if data_file.endswith(extension)]
+    assert data_files
 
     x_shape = None
     y_shape = None
-    for data_file in data_files:
-        with np.load(data_file) as data:
-            data_x_shape = data['x'].shape
-            data_y_shape = data['y'].shape
-            if x_shape is None:
-                x_shape = data_x_shape
-                y_shape = data_y_shape
-            else:
-                x_shape = (x_shape[0] + data_x_shape[0],) + tuple(x_shape[1:])
-                y_shape = (y_shape[0] + data_y_shape[0],) + tuple(y_shape[1:])
+    for data_file in tqdm(data_files):
+        data_x, data_y = read_episode_func(data_file)
+        data_x_shape = data_x.shape
+        data_y_shape = data_y.shape
+        if x_shape is None:
+            x_shape = data_x_shape
+            y_shape = data_y_shape
+        else:
+            x_shape = (x_shape[0] + data_x_shape[0],) + tuple(x_shape[1:])
+            y_shape = (y_shape[0] + data_y_shape[0],) + tuple(y_shape[1:])
 
     x = np.empty(shape=x_shape, dtype=np.float32)
     y = np.empty(shape=y_shape, dtype=np.float32)
     x_cur = 0
     y_cur = 0
-    for i, data_file in enumerate(data_files):
-        print('Reading', data_file)
-        with np.load(data_file) as data:
-            data_x = data['x']
-            data_y = data['y']
-            x[x_cur:(x_cur + data_x.shape[0]), ...] = data_x
-            y[y_cur:(y_cur + data_y.shape[0]), ...] = data_y
-            x_cur += data_x.shape[0]
-            y_cur += data_y.shape[0]
+    for i, data_file in enumerate(tqdm(data_files)):
+        data_x, data_y = read_episode_func(data_file)
+        x[x_cur:(x_cur + data_x.shape[0]), ...] = data_x
+        y[y_cur:(y_cur + data_y.shape[0]), ...] = data_y
+        x_cur += data_x.shape[0]
+        y_cur += data_y.shape[0]
 
     return x, y
+
+
+def _read_data(supervised_data_dir, env):
+    if any(data_file.endswith('.npz') for data_file in os.listdir(supervised_data_dir)):
+        return _do_read_data(supervised_data_dir, '.npz', _read_np_episodes)
+    else:
+        return _do_read_data(supervised_data_dir, '.game', lambda e: _read_txt_episode(e, env))
 
 
 def _softplus_layer(x):
@@ -124,7 +172,7 @@ def main():
     model = keras.Model([net_input], outputs)
     model.compile(optimizer=keras.optimizers.Adam(lr=args.lr), loss_weights=loss_weights, loss=loss)
 
-    x, y = _read_data(args.data_dir)
+    x, y = _read_data(args.data_dir, environment.gym.unwrapped)
     if args.entropy_loss_weight:
         y = [y, np.zeros(shape=y.shape[0])]
 
