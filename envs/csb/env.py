@@ -175,5 +175,6 @@ class CsbEnvVersusV0(CsbEnv):
     use_cp_dist_score = False
     use_raw_rewards = True
     use_negative_rewards = True
+    use_complex_features_mask = True
     dummy_opponent_speed = 0.0
     versus_opponent_update_reward_threshold = 2.0  # 60% of games won

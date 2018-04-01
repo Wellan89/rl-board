@@ -27,16 +27,17 @@ MAX_NB_CHECKPOINTS = max(map(len, BASE_CONFIGURATIONS))
 class Circuit:
 
     def __init__(self):
+        config = random.choice(BASE_CONFIGURATIONS)
+        offset = random.randrange(0, len(config))
+        config = [config[(i + offset) % len(config)] for i in range(len(config))]
         self.cps = [
             Checkpoint(
                 i,
                 point.x + random.randint(-CHECKPOINT_MAX_DEVIATION, CHECKPOINT_MAX_DEVIATION),
                 point.y + random.randint(-CHECKPOINT_MAX_DEVIATION, CHECKPOINT_MAX_DEVIATION),
             )
-            for i, point in enumerate(random.choice(BASE_CONFIGURATIONS))
+            for i, point in enumerate(config)
         ]
-        offset = random.randrange(0, len(self.cps))
-        self.cps = [self.cps[(i + offset) % len(self.cps)] for i in range(len(self.cps))]
 
     def nbcp(self):
         return len(self.cps)
