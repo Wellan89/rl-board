@@ -26,6 +26,8 @@ MAX_NB_CHECKPOINTS = max(map(len, BASE_CONFIGURATIONS))
 
 class Circuit:
 
+    __slots__ = ('cps',)
+
     def __init__(self):
         config = random.choice(BASE_CONFIGURATIONS)
         offset = random.randrange(0, len(config))

@@ -4,6 +4,8 @@ from envs.csb.util import TIMEOUT
 
 class Checkpoint(Unit):
 
+    __slots__ = ()
+
     def __init__(self, id, x, y):
         super().__init__(id, x, y, 200, 0, 0)
 

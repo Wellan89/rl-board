@@ -8,6 +8,8 @@ from envs.csb.util import LIN, MAX_THRUST, TIMEOUT
 
 class Pod(Unit):
 
+    __slots__ = ('angle', 'ncpid', 'timeout', 'shield', 'lap', 'world', 'boost_available')
+
     def __init__(self, id, x, y, world):
         super().__init__(id, x, y, 400, 0, 0)
         self.angle = 0
