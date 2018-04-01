@@ -152,6 +152,7 @@ class GameState:
         self.laps = laps
         self.checkpoints = checkpoints
         self.pods = [Pod() for _ in range(4)]
+        self.first_turn = True
 
     @classmethod
     def read_initial(cls):
@@ -163,6 +164,14 @@ class GameState:
     def read_turn(self):
         for pod in [self.pods[1], self.pods[0], self.pods[3], self.pods[2]]:
             pod.read_turn()
+
+        if self.first_turn:
+            angle = math.atan2(self.checkpoints[1].y - self.checkpoints[0].y,
+                               self.checkpoints[1].x - self.checkpoints[0].x)
+            angle = angle * 180.0 / math.pi
+            for pod in self.pods:
+                pod.angle = angle
+            self.first_turn = False
 
     def extract_state(self):
         complex_features_mask = 0.0
