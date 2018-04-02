@@ -137,11 +137,14 @@ def main():
 
     agent_kwargs = dict(
         device='/job:{}/task:{}'.format('ps' if args.parameter_server else 'worker', args.task_index),
-        distributed=dict(
-            cluster_spec=tf.train.ClusterSpec(cluster),
-            task_index=args.task_index,
-            parameter_server=args.parameter_server,
-            protocol='grpc'
+        execution=dict(
+            type='distributed',
+            distributed_spec=dict(
+                cluster_spec=tf.train.ClusterSpec(cluster),
+                task_index=args.task_index,
+                job='ps' if args.parameter_server else 'worker',
+                protocol='grpc'
+            )
         )
     )
 

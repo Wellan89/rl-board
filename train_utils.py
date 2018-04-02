@@ -6,6 +6,7 @@ import shutil
 import time
 import uuid
 
+import tensorflow as tf
 from tensorforce import TensorForceError
 from tensorforce.agents import Agent
 from tensorforce.execution import Runner
@@ -78,9 +79,17 @@ def do_train(gym_id, do_monitor, monitor_safe, monitor_video, agent_path, agent_
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
 
+    agent_json = dict(
+        execution=dict(
+            type='single',
+            distributed_spec=None,
+            session_config=tf.ConfigProto(intra_op_parallelism_threads=4,
+                                          inter_op_parallelism_threads=8)
+        )
+    )
     if agent_path is not None:
         with open(agent_path, 'r') as fp:
-            agent_json = json.load(fp=fp)
+            agent_json.update(json.load(fp=fp))
     else:
         raise TensorForceError("No agent configuration provided.")
 
