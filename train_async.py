@@ -34,8 +34,9 @@ def main():
     parser.add_argument('-d', '--deterministic', action='store_true', help="Choose actions deterministically")
     parser.add_argument('-M', '--mode', choices=('tmux', 'child'), default='tmux', help="Starter mode")
     parser.add_argument('-W', '--num-workers', type=int, default=1, help="Number of worker agents")
+    parser.add_argument('-P', '--num-parameter-servers', type=int, default=1, help="Number of parameter servers")
     parser.add_argument('-C', '--child', action='store_true', help="Child process")
-    parser.add_argument('-P', '--parameter-server', action='store_true', help="Parameter server")
+    parser.add_argument('--parameter-server', action='store_true', help="Parameter server")
     parser.add_argument('-I', '--task-index', type=int, default=0, help="Task index")
     parser.add_argument('-K', '--kill', action='store_true', help="Kill runners")
     parser.add_argument('-L', '--logdir', default='logs_async', help="Log directory")
@@ -50,8 +51,10 @@ def main():
     session_name = 'OpenAI-' + args.gym_id
     shell = '/bin/bash'
 
+    base_port = 12222
     kill_cmds = [
-        "kill $( lsof -i:12222-{} -t ) > /dev/null 2>&1".format(12222 + args.num_workers),
+        "kill $( lsof -i:{}-{} -t ) > /dev/null 2>&1".format(base_port,
+                                                             base_port + args.num_parameter_servers + args.num_workers),
         "tmux kill-session -t {}".format(session_name),
     ]
     if args.kill:
@@ -80,6 +83,7 @@ def main():
                 '--agent', os.path.join(os.getcwd(), args.agent),
                 '--network', os.path.join(os.getcwd(), args.network),
                 '--num-workers', args.num_workers,
+                '--num-parameter-servers', args.num_parameter_servers,
                 '--child',
                 '--task-index', index
             ]
@@ -104,7 +108,7 @@ def main():
             return cmd_args
 
         if args.mode == 'tmux':
-            cmds = kill_cmds + ['tmux new-session -d -s {} -n ps'.format(session_name)]
+            cmds = kill_cmds + ['tmux new-session -d -s {}'.format(session_name)]
         else:
             assert args.mode == 'child'
             cmds = ['mkdir -p {}'.format(args.logdir),
@@ -112,43 +116,33 @@ def main():
                     'echo "#/bin/bash" > {}/kill.sh'.format(args.logdir),
                     'chmod +x {}/kill.sh'.format(args.logdir)]
 
-        cmds.append(wrap_cmd(session_name, 'ps', build_cmd(ps=True, index=0)))
-
-        for i in range(args.num_workers):
-            name = 'worker{}'.format(i)
-            if args.mode == 'tmux':
-                cmds.append('tmux new-window -t {} -n {} -d {}'.format(session_name, name, shell))
-            cmds.append(wrap_cmd(session_name, name, build_cmd(ps=False, index=i)))
-
-        # add one PS call
-        # cmds.append('tmux new-window -t {} -n ps -d {}'.format(session_name, shell))
+        for is_ps, num in [(True, args.num_parameter_servers), (False, args.num_workers)]:
+            for i in range(num):
+                name = '{}{}'.format('ps' if is_ps else 'worker', i)
+                if args.mode == 'tmux':
+                    cmds.append('tmux new-window -t {} -n {} -d {}'.format(session_name, name, shell))
+                cmds.append(wrap_cmd(session_name, name, build_cmd(ps=is_ps, index=i)))
 
         print("\n".join(cmds))
-
         os.system("\n".join(cmds))
 
         return 0
 
-    ps_hosts = ['127.0.0.1:{}'.format(12222)]
-    worker_hosts = []
-    port = 12223
-    for _ in range(args.num_workers):
-        worker_hosts.append('127.0.0.1:{}'.format(port))
-        port += 1
-    cluster = {'ps': ps_hosts, 'worker': worker_hosts}
-    cluster_spec = tf.train.ClusterSpec(cluster)
+    port = base_port
+    cluster = {'ps': [], 'worker': []}
+    for is_ps, num in [(True, args.num_parameter_servers), (False, args.num_workers)]:
+        for _ in range(num):
+            cluster['ps' if is_ps else 'worker'].append('127.0.0.1:{}'.format(port))
+            port += 1
 
-    agent_kwargs = {}
-    if args.parameter_server:
-        agent_kwargs['device'] = '/job:ps/task:{}'.format(args.task_index)  # '/cpu:0'
-    else:
-        agent_kwargs['device'] = '/job:worker/task:{}'.format(args.task_index)  # '/cpu:0'
-
-    agent_kwargs['distributed'] = dict(
-        cluster_spec=cluster_spec,
-        task_index=args.task_index,
-        parameter_server=args.parameter_server,
-        protocol='grpc'
+    agent_kwargs = dict(
+        device='/job:{}/task:{}'.format('ps' if args.parameter_server else 'worker', args.task_index),
+        distributed=dict(
+            cluster_spec=tf.train.ClusterSpec(cluster),
+            task_index=args.task_index,
+            parameter_server=args.parameter_server,
+            protocol='grpc'
+        )
     )
 
     train_utils.do_train(
