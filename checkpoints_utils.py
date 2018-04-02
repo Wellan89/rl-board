@@ -6,15 +6,24 @@ from tensorflow.python import pywrap_tensorflow
 
 
 TENSOR_CODES = {
-    'dense0/W': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
-    'dense0/b': 'trpo/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/b',
-    'dense1/W': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/W',
-    'dense1/b': 'trpo/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/b',
-    'alpha/W': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/W',
-    'alpha/b': 'trpo/actions-and-internals/beta/parameterize/alpha/apply/b',
-    'beta/W': 'trpo/actions-and-internals/beta/parameterize/beta/apply/W',
-    'beta/b': 'trpo/actions-and-internals/beta/parameterize/beta/apply/b',
+    'dense0/W': '[BASENAME]/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
+    'dense0/b': '[BASENAME]/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/b',
+    'dense1/W': '[BASENAME]/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/W',
+    'dense1/b': '[BASENAME]/actions-and-internals/layered-network/apply/dense1/apply/linear/apply/b',
+    'alpha/W': '[BASENAME]/actions-and-internals/beta/parameterize/alpha/apply/W',
+    'alpha/b': '[BASENAME]/actions-and-internals/beta/parameterize/alpha/apply/b',
+    'beta/W': '[BASENAME]/actions-and-internals/beta/parameterize/beta/apply/W',
+    'beta/b': '[BASENAME]/actions-and-internals/beta/parameterize/beta/apply/b',
 }
+
+
+def _find_agent_basename(var_names):
+    for var_name in var_names:
+        if var_name.startswith('trpo'):
+            return 'trpo'
+        elif var_name.startswith('ppo'):
+            return 'ppo'
+    raise ValueError('Unknown agent basename')
 
 
 def _replace_basename(tensor_name, replacement):
@@ -30,9 +39,11 @@ def _read_weights_from_tf_checkpoint(filename):
 
     weights = {}
     available_tensors = set(reader.get_variable_to_shape_map().keys())
+    agent_basename = _find_agent_basename(list(available_tensors))
     for tensor_key, tensor_name in TENSOR_CODES.items():
+        tensor_name = tensor_name.replace('[BASENAME]', agent_basename)
         if tensor_name not in available_tensors:
-            tensor_name = _replace_basename(tensor_name, 'trpo-ps')
+            tensor_name = _replace_basename(tensor_name, '{}-ps'.format(agent_basename))
         weights[tensor_key] = reader.get_tensor(tensor_name)
     return weights
 
@@ -63,12 +74,16 @@ def restore_agent(filename, agent, task_index):
 
     with agent.model.graph.as_default():
         all_vars = tf.global_variables()
+        agent_basename = _find_agent_basename([var.op.name for var in all_vars])
         for tensor_key, tensor_name in TENSOR_CODES.items():
+            tensor_name = tensor_name.replace('[BASENAME]', agent_basename)
             if task_index is None:
                 tensor_name_variations = [tensor_name]
             else:
-                tensor_name_variations = [_replace_basename(tensor_name, 'trpo-ps'),
-                                          _replace_basename(tensor_name, 'trpo-worker{}'.format(task_index))]
+                tensor_name_variations = [
+                    _replace_basename(tensor_name, '{}-ps'.format(agent_basename)),
+                    _replace_basename(tensor_name, '{}-worker{}'.format(agent_basename, task_index))
+                ]
 
             for tensor_name_var in tensor_name_variations:
                 matching_vars = [var for var in all_vars if var.op.name == tensor_name_var]
