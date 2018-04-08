@@ -113,14 +113,23 @@ def _do_read_data(supervised_data_dir, extension, read_episode_func, read_episod
 
     x_shape = None
     y_shape = None
+    ok_data_files = []
     for data_file in tqdm(data_files):
-        data_x_shape, data_y_shape = read_episode_shape_func(data_file)
+        try:
+            data_x_shape, data_y_shape = read_episode_shape_func(data_file)
+        except Exception:
+            print('Warning: could not read data file:', data_file)
+            continue
+        ok_data_files.append(data_file)
+
         if x_shape is None:
             x_shape = data_x_shape
             y_shape = data_y_shape
         else:
             x_shape = (x_shape[0] + data_x_shape[0],) + tuple(x_shape[1:])
             y_shape = (y_shape[0] + data_y_shape[0],) + tuple(y_shape[1:])
+    data_files = ok_data_files
+    assert data_files
 
     x = np.empty(shape=x_shape, dtype=np.float32)
     y = np.empty(shape=y_shape, dtype=np.float32)

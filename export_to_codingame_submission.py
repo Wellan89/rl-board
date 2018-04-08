@@ -18,10 +18,7 @@ def main():
         tensor_code: (tensor.shape, base64.encodebytes(tensor.astype(np.float16).tobytes()).decode())
         for tensor_code, tensor in weights.items()
     }
-
-    os.makedirs('./submissions', exist_ok=True)
-    with open('./submissions/csb.json', 'w') as f:
-        f.write(json.dumps(weights) + '\n')
+    print(json.dumps(weights))
 
 
 if __name__ == '__main__':

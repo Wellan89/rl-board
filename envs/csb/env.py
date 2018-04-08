@@ -1,6 +1,5 @@
 import gym
 import numpy as np
-from gym.envs.classic_control import rendering
 
 from envs.csb import observation
 from envs.csb.world import World
@@ -102,6 +101,8 @@ class CsbEnv(gym.Env):
         return self._get_state()
 
     def render(self, mode='human'):
+        from gym.envs.classic_control import rendering
+
         if self.viewer is None:
             self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
 
