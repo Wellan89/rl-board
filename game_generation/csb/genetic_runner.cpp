@@ -787,7 +787,7 @@ public:
         if (output_file.is_open()) {
             output_file.close();
         }
-        output_file.open("games/" + to_string(run_nb) + "_" + get_adjective() + "_" + get_noun() + ".game");
+        output_file.open("games/" + to_string(run_nb) + "_" + get_adjective() + "_" + get_noun() + "_" + to_string(rand() % 1000) + ".game");
 
         turn = 0;
         enemyMoves = new Solution[prof];
@@ -868,12 +868,14 @@ public:
         int conf_id = rand() % BASE_CONFIGURATIONS.size();
 
         checkpointCount = BASE_CONFIGURATIONS[conf_id].size();
+        int offset = rand() % checkpointCount;
         for (int i = 0; i < checkpointCount; i++) {
+            int idx = (i + offset) % checkpointCount;
             circuit.cps.push_back(
                 Checkpoint(
                     i,
-                    BASE_CONFIGURATIONS[conf_id][i].x + rand()%(CHECKPOINT_MAX_DEVIATION+1) - CHECKPOINT_MAX_DEVIATION/2,
-                    BASE_CONFIGURATIONS[conf_id][i].y + rand()%(CHECKPOINT_MAX_DEVIATION+1) - CHECKPOINT_MAX_DEVIATION/2
+                    BASE_CONFIGURATIONS[conf_id][idx].x + rand()%(CHECKPOINT_MAX_DEVIATION+1) - CHECKPOINT_MAX_DEVIATION/2,
+                    BASE_CONFIGURATIONS[conf_id][idx].y + rand()%(CHECKPOINT_MAX_DEVIATION+1) - CHECKPOINT_MAX_DEVIATION/2
                 )
             );
         }
