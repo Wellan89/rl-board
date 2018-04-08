@@ -13,7 +13,11 @@ def LIN(x, x1, y1, x2, y2):
     return y1 + (y2-y1)*(x-x1)/(x2-x1)
 
 
-MAX_THRUST = 200
+def CLAMP(x, x_min, x_max):
+    return min(max(x, x_min), x_max)
+
+
+MAX_THRUST = 200.0
 NBPOD = 4
 TIMEOUT = 100
 
@@ -118,28 +122,25 @@ class Pod:
         return self.lap * len(game_state.checkpoints) + last_cp
 
     def get_new_angle(self, gene):
-        res = self.angle
-        res += LIN(gene, 0.0, -18.0, 1.0, 18.0)
-
+        res = self.angle + LIN(CLAMP(gene, 0.1, 0.9), 0.1, -18.0, 0.9, 18.0)
         if res >= 360.0:
             res -= 360.0
         elif res < 0.0:
             res += 360.0
-
         return res
 
     def get_new_power(self, gene):
-        return LIN(gene, 0.0, 0, 1.0, MAX_THRUST)
+        return LIN(CLAMP(gene, 0.1, 0.9), 0.1, 0.0, 0.9, MAX_THRUST)
 
     def output(self, move):
         a = self.get_new_angle(move[0]) * math.pi / 180.0
         px = self.x + math.cos(a) * 1000000.0
         py = self.y + math.sin(a) * 1000000.0
         power = self.get_new_power(move[1])
-        if move[2] < 0.05 and self.boost_available:
+        if move[2] <= 0.1 and self.boost_available:
             self.boost_available = False
             print('{:.0f} {:.0f} BOOST'.format(px, py))
-        elif move[2] > 0.95:
+        elif move[2] >= 0.9:
             self.shield = 4
             print('{:.0f} {:.0f} SHIELD'.format(px, py))
         else:

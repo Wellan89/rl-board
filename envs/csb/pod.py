@@ -3,7 +3,7 @@ import math
 from envs.csb.move import Move
 from envs.csb.unit import Unit
 from envs.csb.point import Point
-from envs.csb.util import LIN, MAX_THRUST, TIMEOUT
+from envs.csb.util import LIN, CLAMP, MAX_THRUST, TIMEOUT
 
 
 class Pod(Unit):
@@ -121,62 +121,42 @@ class Pod(Unit):
         unit.vx += fx / em
         unit.vy += fy / em
 
-    def get_new_angle(self, gene):
-        res = self.angle
-        res += LIN(gene, 0.0, -18.0, 1.0, 18.0)
+    def next_checkpoint(self, world, number_next=0):
+        return world.circuit.cp((self.ncpid + number_next) % world.circuit.nbcp())
 
+    def get_new_angle(self, gene):
+        res = self.angle + LIN(CLAMP(gene, 0.1, 0.9), 0.1, -18.0, 0.9, 18.0)
         if res >= 360.0:
             res -= 360.0
         elif res < 0.0:
             res += 360.0
-
         return res
 
     def get_new_power(self, gene):
-        return LIN(gene, 0.0, 0.0, 1.0, MAX_THRUST)
+        return LIN(CLAMP(gene, 0.1, 0.9), 0.1, 0.0, 0.9, MAX_THRUST)
 
     def apply_move(self, move):
         self.angle = self.get_new_angle(move.g1)
-        if move.g3 < 0.05 and self.boost_available:
+        if move.g3 <= 0.1 and self.boost_available:
             if self.shield == 0:
                 self.boost_available = False
                 self.boost(650)
-        elif move.g3 > 0.95:
+        elif move.g3 >= 0.9:
             self.shield = 4
         else:
             if self.shield == 0:
                 self.boost(self.get_new_power(move.g2))
 
-    def output(self, move):
-        a = self.get_new_angle(move.g1) * math.pi / 180.0
-        px = self.x + math.cos(a) * 1000000.0
-        py = self.y + math.sin(a) * 1000000.0
-        power = self.get_new_power(move.g2)
-        if move.g3 < 0.05 and self.boost_available:
-            print('{} {} BOOST'.format(px, py))
-        elif move.g3 > 0.95:
-            print('{} {} SHIELD'.format(px, py))
-        else:
-            print('{} {} {}'.format(px, py, round(power)))
-
-    def next_checkpoint(self, world, number_next=0):
-        target_cpid = (self.ncpid + number_next) % world.circuit.nbcp()
-        return world.circuit.cp(target_cpid)
-
     def to_dummy_move(self, speed):
-        if speed == 0.0:
-            return Move(0.5, 0.0, 0.5)
-
-        next_cp = self.world.circuit.cp(self.ncpid)
         return Move(
-            g1=min(max(LIN(self.diffAngle(next_cp), -18.0, 0.0, 18.0, 1.0), 0.0), 1.0),
+            g1=CLAMP(LIN(self.diffAngle(self.world.circuit.cp(self.ncpid)), -18.0, 0.1, 18.0, 0.9), 0.1, 0.9),
             g2=speed,
             g3=0.5
         )
 
     def genes_from_vincent_command(self, command):
         return Move(
-            g1=max(min(LIN(self.diffAngle(Point(command.target.x, command.target.y)), -18.0, 0.0, 18.0, 1.0), 1.0), 0.0),
-            g2=max(min(LIN(command.thrust, 0.0, 0.0, MAX_THRUST, 1.0), 1.0), 0.0),
+            g1=CLAMP(LIN(self.diffAngle(Point(command.target.x, command.target.y)), -18.0, 0.1, 18.0, 0.9), 0.1, 0.9),
+            g2=CLAMP(LIN(command.thrust, 0.0, 0.1, MAX_THRUST, 0.9), 0.1, 0.9),
             g3=1.0 if command.shield else 0.5,
         )
