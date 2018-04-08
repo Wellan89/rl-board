@@ -48,6 +48,15 @@ def _read_txt_episode(data_file, env):
             f.readline()  # skip evaluations
 
             actions = [list(map(float, f.readline().split())) for _ in range(2)]
+            for action in actions:
+                for g in [2, 5]:
+                    if action[g] < 0.05:
+                        action[g] = 0.0
+                    elif action[g] > 0.95:
+                        action[g] = 1.0
+                    else:
+                        action[g] = 0.5
+
             x.append(env.compute_custom_state(world, opponent_view=False))
             y.append(actions[0])
             x.append(env.compute_custom_state(world, opponent_view=True))
