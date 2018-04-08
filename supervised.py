@@ -71,6 +71,7 @@ def _read_txt_episode(data_file, env):
                         action[g] = 0.9
                     else:
                         action[g] = 0.5
+                assert all(0.0 <= v <= 1.0 for v in action)
 
             x.append(env.compute_custom_state(world, opponent_view=False))
             y.append(actions[0])
@@ -197,6 +198,14 @@ class AdjustEntropyLossCallback(keras.callbacks.Callback):
         K.set_value(self.entropy_loss_bonus, target_entropy_weight)
 
 
+def _distribution_loss(y_true, y_pred):
+    import tensorflow as tf
+    alpha, beta = tf.split(y_pred, 2, axis=-1)
+    log_norm = tf.lgamma(x=alpha) + tf.lgamma(x=beta) - tf.lgamma(x=alpha + beta)
+    prob = tf.pow(x=y_true, y=alpha - 1.0) * tf.pow(x=1.0 - y_true, y=beta - 1.0) / tf.exp(log_norm)
+    return -tf.reduce_mean(tf.log(prob + 1e-6))
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -206,8 +215,9 @@ def main():
     parser.add_argument('--monitor', default=None, help="Save results to this directory")
     parser.add_argument('--data-dir', default=None, help="Directory containing the supervised training data")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
-    parser.add_argument('--loss', default='mean_absolute_error', help="Loss")
     parser.add_argument('--batch-size', type=int, default=512, help="Training batch size")
+    parser.add_argument('--action-loss-weight', type=float, default=1.0, help="Action loss weight")
+    parser.add_argument('--distribution-loss-weight', type=float, default=0.0, help="Distribution loss weight")
     parser.add_argument('--entropy-loss-weight', type=float, default=0.001, help="Entropy loss weight")
     parser.add_argument('--entropy-initial-weight', type=float, default=0.1, help="Entropy loss weight for the first epoch")
 
@@ -239,29 +249,42 @@ def main():
     beta = keras.layers.Lambda(_softplus_layer)(beta)
 
     alpha_beta = keras.layers.add([alpha, beta])
-    action = keras.layers.Lambda(lambda x: x[0] / x[1], name='action')([beta, alpha_beta])
 
-    outputs = [action]
-    loss_weights = {'action': 1.0}
-    loss = {'action': args.loss}
+    x, y = _read_data(args.data_dir, environment.gym.unwrapped)
+
+    outputs = []
+    targets = []
+    loss_weights = {}
+    loss = {}
+    if args.action_loss_weight:
+        action = keras.layers.Lambda(lambda x: x[0] / x[1], name='action')([beta, alpha_beta])
+        outputs.append(action)
+        targets.append(y)
+        loss_weights['action'] = args.action_loss_weight
+        loss['action'] = 'mean_absolute_error'
+
+    if args.distribution_loss_weight:
+        distribution = keras.layers.concatenate([alpha, beta], name='distribution')
+        outputs.append(distribution)
+        targets.append(y)
+        loss_weights['distribution'] = args.distribution_loss_weight
+        loss['distribution'] = _distribution_loss
 
     entropy_layer = EntropyLayer(name='entropy')
     if args.entropy_loss_weight:
         entropy = entropy_layer([alpha, beta, alpha_beta])
         outputs.append(entropy)
+        targets.append(np.zeros(shape=y.shape[0]))
         loss_weights['entropy'] = args.entropy_loss_weight
         loss['entropy'] = lambda y_true, y_pred: y_pred
 
+    assert outputs
     model = keras.Model([net_input], outputs)
     model.compile(optimizer=keras.optimizers.Adam(lr=args.lr), loss_weights=loss_weights, loss=loss)
 
-    x, y = _read_data(args.data_dir, environment.gym.unwrapped)
-    if args.entropy_loss_weight:
-        y = [y, np.zeros(shape=y.shape[0])]
-
-    model_name = 'keras_model_loss={}_lr={}_entropy={}.h5'.format(args.loss, args.lr, args.entropy_loss_weight)
+    model_name = 'keras_model_lr={}_entropy={}.h5'.format(args.lr, args.entropy_loss_weight)
     os.makedirs(save_dir, exist_ok=True)
-    model.fit(x, y, batch_size=args.batch_size, epochs=args.epochs, validation_split=0.1,
+    model.fit(x, targets, batch_size=args.batch_size, epochs=args.epochs, validation_split=0.1,
               callbacks=[keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name), save_best_only=True),
                          AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight,
                                                    args.entropy_initial_weight)])
