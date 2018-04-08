@@ -1,4 +1,5 @@
 import argparse
+import functools
 import json
 import os
 
@@ -19,6 +20,11 @@ def _basename_no_ext(filename):
 def _read_np_episodes(data_file):
     with np.load(data_file) as data:
         return data['x'], data['y']
+
+
+def _read_np_episodes_shape(data_file):
+    data_x, data_y = _read_np_episodes(data_file)
+    return data_x.shape, data_y.shape
 
 
 def _read_txt_episode(data_file, env):
@@ -65,7 +71,33 @@ def _read_txt_episode(data_file, env):
     return np.array(x, dtype=np.float32), np.array(y, dtype=np.float32)
 
 
-def _do_read_data(supervised_data_dir, extension, read_episode_func):
+def _read_txt_episodes_shape(data_file, env):
+    x_shape = [0, env.observation_space.shape[0]]
+    y_shape = [0, env.action_space.shape[0]]
+    with open(data_file) as f:
+        _, checkpoints_count = map(int, f.readline().split())
+        for i in range(checkpoints_count):
+            f.readline()  # checkpoints
+
+        turn_idx = 0
+        while True:
+            new_turn_idx = int(f.readline())
+            if new_turn_idx <= turn_idx:
+                # End of the game
+                break
+            turn_idx = new_turn_idx
+
+            # 4 pods + evaluations + 2 actions
+            for _ in range(7):
+                f.readline()  # pods
+
+            x_shape[0] += 2
+            y_shape[0] += 2
+
+    return tuple(x_shape), tuple(y_shape)
+
+
+def _do_read_data(supervised_data_dir, extension, read_episode_func, read_episode_shape_func):
     data_files = [os.path.join(supervised_data_dir, data_file)
                   for data_file in sorted(os.listdir(supervised_data_dir))
                   if data_file.endswith(extension)]
@@ -74,9 +106,7 @@ def _do_read_data(supervised_data_dir, extension, read_episode_func):
     x_shape = None
     y_shape = None
     for data_file in tqdm(data_files):
-        data_x, data_y = read_episode_func(data_file)
-        data_x_shape = data_x.shape
-        data_y_shape = data_y.shape
+        data_x_shape, data_y_shape = read_episode_shape_func(data_file)
         if x_shape is None:
             x_shape = data_x_shape
             y_shape = data_y_shape
@@ -100,9 +130,12 @@ def _do_read_data(supervised_data_dir, extension, read_episode_func):
 
 def _read_data(supervised_data_dir, env):
     if any(data_file.endswith('.npz') for data_file in os.listdir(supervised_data_dir)):
-        return _do_read_data(supervised_data_dir, '.npz', _read_np_episodes)
+        return _do_read_data(supervised_data_dir, '.npz',
+                             _read_np_episodes, _read_np_episodes_shape)
     else:
-        return _do_read_data(supervised_data_dir, '.game', lambda e: _read_txt_episode(e, env))
+        return _do_read_data(supervised_data_dir, '.game',
+                             functools.partial(_read_txt_episode, env=env),
+                             functools.partial(_read_txt_episodes_shape, env=env))
 
 
 def _softplus_layer(x):
