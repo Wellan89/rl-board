@@ -4,6 +4,7 @@ import json
 import os
 
 import keras
+from keras import backend as K
 import numpy as np
 from tensorforce.contrib.openai_gym import OpenAIGym
 from tqdm import tqdm
@@ -166,14 +167,34 @@ def _softplus_layer(x):
     return x
 
 
-def _entropy_layer(x):
-    # Tensorflow needs to be imported here so that the saved model can be loaded again
-    import tensorflow as tf
-    alpha, beta, alpha_beta = x
-    log_norm = tf.lgamma(x=alpha) + tf.lgamma(x=beta) - tf.lgamma(x=alpha_beta)
-    entropy = log_norm - (beta - 1.0) * tf.digamma(x=beta) - (alpha - 1.0) * tf.digamma(x=alpha) \
-        + (alpha_beta - 2.0) * tf.digamma(x=alpha_beta)
-    return tf.reduce_mean(entropy)
+class EntropyLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.entropy_loss_bonus = K.variable(1.0)
+
+    def call(self, inputs, **kwargs):
+        # Tensorflow needs to be imported here so that the saved model can be loaded again
+        import tensorflow as tf
+        alpha, beta, alpha_beta = inputs
+        log_norm = tf.lgamma(x=alpha) + tf.lgamma(x=beta) - tf.lgamma(x=alpha_beta)
+        entropy = log_norm - (beta - 1.0) * tf.digamma(x=beta) - (alpha - 1.0) * tf.digamma(x=alpha) \
+            + (alpha_beta - 2.0) * tf.digamma(x=alpha_beta)
+        return tf.reduce_mean(entropy) * self.entropy_loss_bonus
+
+
+class AdjustEntropyLossCallback(keras.callbacks.Callback):
+    def __init__(self, entropy_loss_bonus, entropy_loss_weight, entropy_initial_weight):
+        super().__init__()
+        self.entropy_loss_bonus = entropy_loss_bonus
+        self.entropy_loss_weight = entropy_loss_weight
+        self.entropy_initial_weight = entropy_initial_weight
+
+    def on_epoch_begin(self, epoch, logs=None):
+        if self.entropy_loss_weight and self.entropy_loss_weight < self.entropy_initial_weight and epoch == 0:
+            target_entropy_weight = self.entropy_initial_weight / self.entropy_loss_weight
+        else:
+            target_entropy_weight = 1.0
+        K.set_value(self.entropy_loss_bonus, target_entropy_weight)
 
 
 def main():
@@ -186,7 +207,9 @@ def main():
     parser.add_argument('--data-dir', default=None, help="Directory containing the supervised training data")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--loss', default='mean_absolute_error', help="Loss")
-    parser.add_argument('--entropy-loss-weight', type=float, default=0.05, help="Entropy loss weight")
+    parser.add_argument('--batch-size', type=int, default=512, help="Training batch size")
+    parser.add_argument('--entropy-loss-weight', type=float, default=0.001, help="Entropy loss weight")
+    parser.add_argument('--entropy-initial-weight', type=float, default=0.1, help="Entropy loss weight for the first epoch")
 
     args = parser.parse_args()
 
@@ -222,8 +245,9 @@ def main():
     loss_weights = {'action': 1.0}
     loss = {'action': args.loss}
 
+    entropy_layer = EntropyLayer(name='entropy')
     if args.entropy_loss_weight:
-        entropy = keras.layers.Lambda(_entropy_layer, name='entropy')([alpha, beta, alpha_beta])
+        entropy = entropy_layer([alpha, beta, alpha_beta])
         outputs.append(entropy)
         loss_weights['entropy'] = args.entropy_loss_weight
         loss['entropy'] = lambda y_true, y_pred: y_pred
@@ -237,8 +261,10 @@ def main():
 
     model_name = 'keras_model_loss={}_lr={}_entropy={}.h5'.format(args.loss, args.lr, args.entropy_loss_weight)
     os.makedirs(save_dir, exist_ok=True)
-    model.fit(x, y, batch_size=512, epochs=args.epochs, validation_split=0.1,
-              callbacks=[keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name), save_best_only=True)])
+    model.fit(x, y, batch_size=args.batch_size, epochs=args.epochs, validation_split=0.1,
+              callbacks=[keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name), save_best_only=True),
+                         AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight,
+                                                   args.entropy_initial_weight)])
 
 
 if __name__ == '__main__':

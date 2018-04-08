@@ -4,6 +4,8 @@ import keras
 import tensorflow as tf
 from tensorflow.python import pywrap_tensorflow
 
+import supervised
+
 
 TENSOR_CODES = {
     'dense0/W': '[BASENAME]/actions-and-internals/layered-network/apply/dense0/apply/linear/apply/W',
@@ -52,7 +54,8 @@ def _read_weights_from_keras(filename):
     tensor_values = {}
     with tf.Graph().as_default():
         print('Reading weights from:', filename)
-        model = keras.models.load_model(filename, compile=False)
+        model = keras.models.load_model(filename, compile=False,
+                                        custom_objects={'EntropyLayer': supervised.EntropyLayer})
         for tensor_key in TENSOR_CODES.keys():
             layer_weights = model.get_layer(tensor_key.split('/')[0]).get_weights()
             tensor_weights = layer_weights[0 if tensor_key.endswith('/W') else 1]
