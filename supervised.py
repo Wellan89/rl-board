@@ -191,7 +191,8 @@ class AdjustEntropyLossCallback(keras.callbacks.Callback):
         self.entropy_initial_weight = entropy_initial_weight
 
     def on_epoch_begin(self, epoch, logs=None):
-        if self.entropy_loss_weight and self.entropy_loss_weight < self.entropy_initial_weight and epoch == 0:
+        if self.entropy_loss_weight and self.entropy_initial_weight is not None \
+                and self.entropy_loss_weight < self.entropy_initial_weight and epoch == 0:
             target_entropy_weight = self.entropy_initial_weight / self.entropy_loss_weight
         else:
             target_entropy_weight = 1.0
@@ -219,7 +220,7 @@ def main():
     parser.add_argument('--action-loss-weight', type=float, default=1.0, help="Action loss weight")
     parser.add_argument('--distribution-loss-weight', type=float, default=0.0, help="Distribution loss weight")
     parser.add_argument('--entropy-loss-weight', type=float, default=0.001, help="Entropy loss weight")
-    parser.add_argument('--entropy-initial-weight', type=float, default=0.1, help="Entropy loss weight for the first epoch")
+    parser.add_argument('--entropy-initial-weight', type=float, default=None, help="Entropy loss weight for the first epoch")
 
     args = parser.parse_args()
 
