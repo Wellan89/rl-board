@@ -238,10 +238,25 @@ def main():
 
     net_input = keras.layers.Input(shape=(environment.states['shape']))
     network = net_input
-    for i, layer in enumerate(network_def):
-        assert layer['type'] == 'dense'
-        network = keras.layers.Dense(units=layer['size'], activation=layer['activation'],
-                                     name='dense{}'.format(i))(network)
+    for i, layer_def in enumerate(network_def):
+        assert layer_def['type'] == 'dense'
+
+        if layer_def.get('skip'):
+            assert layer_def.get('size') is None
+            units = int(network.shape[1])
+        else:
+            units = layer_def['size']
+
+        layer = keras.layers.Dense(units=units, activation=layer_def['activation'],
+                                   name='dense{}'.format(i))(network)
+
+        if layer_def.get('skip'):
+            layer = keras.layers.Dense(units=units, activation=None,
+                                       name='dense{}-skip'.format(i))(layer)
+            layer = keras.layers.add([network, layer])
+            layer = keras.layers.Activation(activation=layer_def['activation'])(layer)
+
+        network = layer
 
     alpha = keras.layers.Dense(units=environment.actions['shape'][0], name='alpha')(network)
     alpha = keras.layers.Lambda(_softplus_layer)(alpha)
