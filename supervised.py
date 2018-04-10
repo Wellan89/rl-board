@@ -4,8 +4,9 @@ import json
 import os
 
 import keras
-from keras import backend as K
 import numpy as np
+import scipy.stats
+from keras import backend as K
 from tensorforce.contrib.openai_gym import OpenAIGym
 from tqdm import tqdm
 
@@ -221,6 +222,8 @@ def main():
     parser.add_argument('--distribution-loss-weight', type=float, default=0.0, help="Distribution loss weight")
     parser.add_argument('--entropy-loss-weight', type=float, default=0.001, help="Entropy loss weight")
     parser.add_argument('--entropy-initial-weight', type=float, default=None, help="Entropy loss weight for the first epoch")
+    parser.add_argument('--outliers-removal-frequency', type=int, default=None, help="Outliers removal frequency (epochs)")
+    parser.add_argument('--outliers-removal-proportion', type=float, default=None, help="Outliers removal proportion")
 
     args = parser.parse_args()
 
@@ -269,20 +272,20 @@ def main():
     x, y = _read_data(args.data_dir, environment.gym.unwrapped)
 
     outputs = []
-    targets = []
+    target_funcs = []
     loss_weights = {}
     loss = {}
     if args.action_loss_weight:
         action = keras.layers.Lambda(lambda x: x[0] / x[1], name='action')([beta, alpha_beta])
         outputs.append(action)
-        targets.append(y)
+        target_funcs.append(lambda y: y)
         loss_weights['action'] = args.action_loss_weight
         loss['action'] = 'mean_absolute_error'
 
     if args.distribution_loss_weight:
         distribution = keras.layers.concatenate([alpha, beta], name='distribution')
         outputs.append(distribution)
-        targets.append(y)
+        target_funcs.append(lambda y: y)
         loss_weights['distribution'] = args.distribution_loss_weight
         loss['distribution'] = _distribution_loss
 
@@ -290,7 +293,7 @@ def main():
     if args.entropy_loss_weight:
         entropy = entropy_layer([alpha, beta, alpha_beta])
         outputs.append(entropy)
-        targets.append(np.zeros(shape=y.shape[0]))
+        target_funcs.append(lambda y: np.zeros(shape=y.shape[0]))
         loss_weights['entropy'] = args.entropy_loss_weight
         loss['entropy'] = lambda y_true, y_pred: y_pred
 
@@ -300,10 +303,51 @@ def main():
 
     model_name = 'keras_model_lr={}_entropy={}.h5'.format(args.lr, args.entropy_loss_weight)
     os.makedirs(save_dir, exist_ok=True)
-    model.fit(x, targets, batch_size=args.batch_size, epochs=args.epochs, validation_split=0.1,
-              callbacks=[keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name), save_best_only=True),
-                         AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight,
-                                                   args.entropy_initial_weight)])
+    callbacks = [
+        keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name + '_best.h5'), save_best_only=True),
+        keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name + '_latest.h5'), save_best_only=False),
+        AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight, args.entropy_initial_weight)
+    ]
+
+    validation_split = 0.1
+    split_at = int(x.shape[0] * (1.0 - validation_split))
+    x, x_val = x[:split_at], x[split_at:]
+    y, y_val = y[:split_at], y[split_at:]
+
+    pred = model.predict(x)
+    if len(outputs) > 1:
+        pred = pred[0]
+    losses = np.mean(np.abs(pred - y), axis=1)
+    mask = np.logical_and(np.logical_not(np.isnan(losses)), np.isfinite(losses))
+    print(x.shape[0] - np.sum(mask, dtype=np.int), 'NaN or infinite losses found')
+    x = x[mask]
+    y = y[mask]
+
+    remove_outliers = args.outliers_removal_frequency and args.outliers_removal_proportion
+    epoch_steps = args.outliers_removal_frequency if remove_outliers else args.epochs
+    for epoch in range(0, args.epochs, epoch_steps):
+        model.fit(x, [target_func(y) for target_func in target_funcs], batch_size=args.batch_size,
+                  validation_data=(x_val, [target_func(y_val) for target_func in target_funcs]),
+                  initial_epoch=epoch, epochs=epoch + epoch_steps, callbacks=callbacks)
+
+        if not remove_outliers:
+            break
+
+        pred = model.predict(x)
+        if len(outputs) > 1:
+            pred = pred[0]
+        losses = np.mean(np.abs(pred - y), axis=1)
+        max_loss = np.percentile(losses, q=100.0 * (1.0 - args.outliers_removal_proportion))
+        print('Losses:', scipy.stats.describe(losses))
+        print('Max allowed loss:', max_loss)
+        mask = losses < max_loss
+        print(x.shape[0] - np.sum(mask, dtype=np.int), 'examples above threshold')
+        x = x[mask]
+        y = y[mask]
+
+        if x.shape[0] < 100:
+            print(x.shape[0], 'examples remaining: exiting')
+            break
 
 
 if __name__ == '__main__':
