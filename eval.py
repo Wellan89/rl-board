@@ -64,7 +64,7 @@ def main():
     eval_idx = 0
     while True:
         eval_idx += 1
-        print('{} - Evaluation {}:'.format(datetime.datetime.now(), eval_idx))
+        print('{} - Evaluation {} ({} run):'.format(datetime.datetime.now(), eval_idx, 'deterministic' if args.deterministic else 'random'))
         rewards = _compute_rewards(gym_id=args.gym_id, model_path=args.load, episodes=args.episodes,
                                    monitor=monitor, processes=args.processes, deterministic=bool(args.deterministic))
 

@@ -1,7 +1,9 @@
 import argparse
+import datetime
 import functools
 import json
 import os
+import sys
 
 import keras
 import numpy as np
@@ -79,7 +81,11 @@ def _read_txt_episode(data_file, env):
             x.append(env.compute_custom_state(world, opponent_view=True))
             y.append(actions[1])
 
-    return np.array(x, dtype=np.float32), np.array(y, dtype=np.float32)
+    x = np.array(x, dtype=np.float32)
+    y = np.array(y, dtype=np.float32)
+    if np.any(np.isnan(x)) or np.any(np.isnan(y)):
+        raise ValueError('NaN value in data file {}'.format(data_file))
+    return x, y
 
 
 def _read_txt_episodes_shape(data_file, env):
@@ -108,10 +114,12 @@ def _read_txt_episodes_shape(data_file, env):
     return tuple(x_shape), tuple(y_shape)
 
 
-def _do_read_data(supervised_data_dir, extension, read_episode_func, read_episode_shape_func):
+def _do_read_data(supervised_data_dir, max_data_files, extension, read_episode_func, read_episode_shape_func):
     data_files = [os.path.join(supervised_data_dir, data_file)
                   for data_file in sorted(os.listdir(supervised_data_dir))
                   if data_file.endswith(extension)]
+    if max_data_files is not None:
+        data_files = data_files[:max_data_files]
     assert data_files
 
     x_shape = None
@@ -148,12 +156,12 @@ def _do_read_data(supervised_data_dir, extension, read_episode_func, read_episod
     return x, y
 
 
-def _read_data(supervised_data_dir, env):
+def _read_data(supervised_data_dir, max_data_files, env):
     if any(data_file.endswith('.npz') for data_file in os.listdir(supervised_data_dir)):
-        return _do_read_data(supervised_data_dir, '.npz',
+        return _do_read_data(supervised_data_dir, max_data_files, '.npz',
                              _read_np_episodes, _read_np_episodes_shape)
     else:
-        return _do_read_data(supervised_data_dir, '.game',
+        return _do_read_data(supervised_data_dir, max_data_files, '.game',
                              functools.partial(_read_txt_episode, env=env),
                              functools.partial(_read_txt_episodes_shape, env=env))
 
@@ -212,15 +220,16 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('gym_id', help="Id of the Gym environment")
-    parser.add_argument('-n', '--network', default=None, help="Network specification file")
-    parser.add_argument('--epochs', type=int, default=100, help="Number of epochs")
+    parser.add_argument('-n', '--network', help="Network specification file")
+    parser.add_argument('--epochs', type=int, default=1000, help="Number of epochs")
     parser.add_argument('--monitor', default=None, help="Save results to this directory")
     parser.add_argument('--data-dir', default=None, help="Directory containing the supervised training data")
+    parser.add_argument('--max-data-files', type=int, default=None, help="Maximum number of data files to load")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
-    parser.add_argument('--batch-size', type=int, default=512, help="Training batch size")
+    parser.add_argument('--batch-size', type=int, default=4096, help="Training batch size")
     parser.add_argument('--action-loss-weight', type=float, default=1.0, help="Action loss weight")
     parser.add_argument('--distribution-loss-weight', type=float, default=0.0, help="Distribution loss weight")
-    parser.add_argument('--entropy-loss-weight', type=float, default=0.001, help="Entropy loss weight")
+    parser.add_argument('--entropy-loss-weight', type=float, default=0.0, help="Entropy loss weight")
     parser.add_argument('--entropy-initial-weight', type=float, default=None, help="Entropy loss weight for the first epoch")
     parser.add_argument('--outliers-removal-frequency', type=int, default=None, help="Outliers removal frequency (epochs)")
     parser.add_argument('--outliers-removal-proportion', type=float, default=None, help="Outliers removal proportion")
@@ -228,16 +237,19 @@ def main():
     args = parser.parse_args()
 
     if not args.monitor:
-        args.monitor = 'supervised_{}_{}'.format(args.gym_id, _basename_no_ext(args.network))
+        args.monitor = 'supervised_{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.network), datetime.datetime.now().isoformat())
     if not args.data_dir:
         args.data_dir = 'logs/supervised_data_{}'.format(args.gym_id)
 
     with open(args.network, 'r') as fp:
         network_def = json.load(fp=fp)
 
-    environment = OpenAIGym(gym_id=args.gym_id)
+    save_dir = 'logs/{}'.format(args.monitor)
+    os.makedirs(save_dir, exist_ok=True)
+    checkpoints_save_dir = os.path.join(save_dir, 'checkpoints')
+    os.makedirs(checkpoints_save_dir, exist_ok=True)
 
-    save_dir = 'logs/{}/checkpoints'.format(args.monitor)
+    environment = OpenAIGym(gym_id=args.gym_id)
 
     net_input = keras.layers.Input(shape=(environment.states['shape']))
     network = net_input
@@ -269,7 +281,7 @@ def main():
 
     alpha_beta = keras.layers.add([alpha, beta])
 
-    x, y = _read_data(args.data_dir, environment.gym.unwrapped)
+    x, y = _read_data(args.data_dir, args.max_data_files, environment.gym.unwrapped)
 
     outputs = []
     target_funcs = []
@@ -301,27 +313,17 @@ def main():
     model = keras.Model([net_input], outputs)
     model.compile(optimizer=keras.optimizers.Adam(lr=args.lr), loss_weights=loss_weights, loss=loss)
 
-    model_name = 'keras_model_lr={}_entropy={}.h5'.format(args.lr, args.entropy_loss_weight)
-    os.makedirs(save_dir, exist_ok=True)
     callbacks = [
-        keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name + '_best.h5'), save_best_only=True),
-        keras.callbacks.ModelCheckpoint(os.path.join(save_dir, model_name + '_latest.h5'), save_best_only=False),
-        AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight, args.entropy_initial_weight)
+        keras.callbacks.CSVLogger(os.path.join(save_dir, 'training_log.csv')),
+        keras.callbacks.ModelCheckpoint(os.path.join(checkpoints_save_dir, 'keras_model_best.h5'), save_best_only=True),
+        keras.callbacks.ModelCheckpoint(os.path.join(checkpoints_save_dir, 'keras_model_latest.h5'), save_best_only=False),
+        AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight, args.entropy_initial_weight),
     ]
 
     validation_split = 0.1
     split_at = int(x.shape[0] * (1.0 - validation_split))
     x, x_val = x[:split_at], x[split_at:]
     y, y_val = y[:split_at], y[split_at:]
-
-    pred = model.predict(x)
-    if len(outputs) > 1:
-        pred = pred[0]
-    losses = np.mean(np.abs(pred - y), axis=1)
-    mask = np.logical_and(np.logical_not(np.isnan(losses)), np.isfinite(losses))
-    print(x.shape[0] - np.sum(mask, dtype=np.int), 'NaN or infinite losses found')
-    x = x[mask]
-    y = y[mask]
 
     remove_outliers = args.outliers_removal_frequency and args.outliers_removal_proportion
     epoch_steps = args.outliers_removal_frequency if remove_outliers else args.epochs
