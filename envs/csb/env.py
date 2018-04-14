@@ -1,3 +1,4 @@
+import os
 import gym
 import numpy as np
 
@@ -6,9 +7,11 @@ from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
 
+DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
+
 
 class CsbEnv(gym.Env):
-    metadata = {'render.modes': ['human', 'rgb_array']}
+    metadata = {'render.modes': ['human', 'rgb_array'] if not DISABLE_RENDERING else []}
     reward_range = (-np.inf, np.inf)
     spec = None
 
@@ -98,6 +101,9 @@ class CsbEnv(gym.Env):
         return self._get_state()
 
     def render(self, mode='human'):
+        if DISABLE_RENDERING:
+            return None
+
         self.viewer, rendered = self.world.render(viewer=self.viewer, mode=mode)
         return rendered
 
