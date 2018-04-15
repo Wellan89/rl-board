@@ -17,17 +17,13 @@ def CLAMP(x, x_min, x_max):
     return min(max(x, x_min), x_max)
 
 
-MAX_THRUST = 200.0
-NBPOD = 4
-TIMEOUT = 100
-
-
 def _matmul(a, b):
     return np.einsum('i,ij->j', a, b)
 
 
 class Model:
     def __init__(self, weights, deterministic=True):
+        assert weights
         self.weights = weights
         self.deterministic = deterministic
 
@@ -35,21 +31,28 @@ class Model:
     def from_data(cls, model_data):
         weights = {
             var: np.reshape(
-                np.fromstring(base64.decodebytes(data.encode()), dtype=np.float16).astype(np.float32), shape
-            ) for var, (shape, data) in model_data.items()
+                np.fromstring(base64.decodebytes(data.encode()), dtype=dtype).astype(np.float32), shape
+            ) for var, (shape, dtype, data) in model_data.items()
         }
         return cls(weights=weights)
 
     def predict(self, state):
         layer = np.array(state, dtype=np.float32)
+        state_mean = self.weights['pi/obfilter/runningsum:0'] / self.weights['pi/obfilter/count:0']
+        state_std = np.sqrt(np.maximum(
+            (self.weights['pi/obfilter/runningsumsq:0'] / self.weights['pi/obfilter/count:0']) - np.square(state_mean),
+            1e-2
+        ))
+        layer = np.clip((layer - state_mean) / state_std, -5.0, 5.0)
+
         layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
         layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
         action = np.tanh(_matmul(layer, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0'])
 
         if not self.deterministic:
-            action = np.random.normal(action, self.weights['pi/pol/logstd:0'])
+            action = np.random.normal(action, np.exp(self.weights['pi/pol/logstd:0'][0]))
 
-        return action
+        return np.clip(action, 0.0, 1.0)
 
     def compute_action(self, game_state):
         action = self.predict(game_state.extract_state())
@@ -83,13 +86,13 @@ class Pod:
         self.boost_available = True
         self.shield = 0
         self.lap = 0
-        self.timeout = TIMEOUT
+        self.timeout = 100
 
     def read_turn(self):
         x, y, vx, vy, angle, next_check_point_id = map(int, input().split())
 
         if self.next_check_point_id != next_check_point_id:
-            self.timeout = TIMEOUT
+            self.timeout = 100
             if next_check_point_id == 0:
                 self.lap += 1
 
@@ -121,14 +124,11 @@ class Pod:
             res += 360.0
         return res
 
-    def get_new_power(self, gene):
-        return LIN(CLAMP(gene, 0.1, 0.9), 0.1, 0.0, 0.9, MAX_THRUST)
-
     def output(self, move):
         a = self.get_new_angle(move[0]) * math.pi / 180.0
         px = self.x + math.cos(a) * 1000000.0
         py = self.y + math.sin(a) * 1000000.0
-        power = self.get_new_power(move[1])
+        power = LIN(CLAMP(move[1], 0.1, 0.9), 0.1, 0.0, 0.9, 200.0)
         if move[2] <= 0.1 and self.boost_available:
             self.boost_available = False
             print('{:.0f} {:.0f} BOOST'.format(px, py))
@@ -176,7 +176,7 @@ class GameState:
                 pod.vy / 1000.0,
                 pod.angle / 360.0,
                 float(pod.boost_available),
-                pod.timeout / TIMEOUT,
+                pod.timeout / 100.0,
                 pod.shield / 4.0,
                 float(pod.nb_checked(self)),
             ]

@@ -51,6 +51,8 @@ class CsbEnv(gym.Env):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
 
+        action = np.clip(action, 0.0, 1.0)
+
         if not self.use_raw_rewards:
             best_pod = max(self.world.pods[:2], key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
             current_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)

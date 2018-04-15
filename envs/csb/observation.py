@@ -11,7 +11,7 @@ def observation(world, pods):
             pod.vy / 1000.0,
             pod.angle / 360.0,
             float(pod.boost_available),
-            pod.timeout / util.TIMEOUT,
+            pod.timeout / 100.0,
             pod.shield / 4.0,
             float(pod.nbChecked()),
         ]

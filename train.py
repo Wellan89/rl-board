@@ -17,7 +17,7 @@ import csb
 
 
 def _load_vars_dict(local_vars):
-    vars_list = local_vars['var_list']
+    vars_list = local_vars['pi'].get_variables()
     vars_values = tf.get_default_session().run(vars_list)
     return {var.name: var_value for var, var_value in zip(vars_list, vars_values)}
 
@@ -28,10 +28,9 @@ class SaveCallback:
         self.log_dir = log_dir
 
     def __call__(self, local_vars, global_vars):
-        if self.rank == 0:
-            filename = os.path.join(self.log_dir, 'model.npz')
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            np.savez_compressed(filename, **_load_vars_dict(local_vars))
+        filename = os.path.join(self.log_dir, 'model_{}.npz'.format(self.rank))
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        np.savez_compressed(filename, **_load_vars_dict(local_vars))
 
 
 class HardEnvCallback:
@@ -108,7 +107,7 @@ class ReloadCallback:
 
 
 def policy_fn(name, ob_space, ac_space):
-    return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=64, num_hid_layers=2)
+    return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=80, num_hid_layers=2)
 
 
 def main():
