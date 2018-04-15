@@ -1,6 +1,7 @@
 import os
 
 import keras
+import numpy as np
 import tensorflow as tf
 from tensorflow.python import pywrap_tensorflow
 
@@ -63,9 +64,16 @@ def _read_weights_from_keras(filename):
     return tensor_values
 
 
+def _read_weights_from_numpy(filename):
+    data = np.load(filename)
+    return {k: data[k] for k in data.files}
+
+
 def read_weights(filename):
     if filename.endswith('.h5'):
         weights = _read_weights_from_keras(filename)
+    elif filename.endswith('.npz'):
+        weights = _read_weights_from_numpy(filename)
     else:
         weights = _read_weights_from_tf_checkpoint(filename)
     return weights

@@ -1,6 +1,6 @@
 import argparse
 
-import train_utils
+import tensorforce_train_utils
 
 
 # python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
@@ -24,7 +24,7 @@ def main():
 
     args = parser.parse_args()
 
-    train_utils.do_train(
+    tensorforce_train_utils.do_train(
         gym_id=args.gym_id,
         do_monitor=True,
         monitor_safe=args.monitor_safe,

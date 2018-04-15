@@ -42,21 +42,13 @@ class Model:
 
     def predict(self, state):
         layer = np.array(state, dtype=np.float32)
-        layer = np.tanh(_matmul(layer, self.weights['dense0/W']) + self.weights['dense0/b'])
-        layer = np.tanh(_matmul(layer, self.weights['dense1/W']) + self.weights['dense1/b'])
-
-        log_eps = math.log(1e-6)
-        alpha = _matmul(layer, self.weights['alpha/W']) + self.weights['alpha/b']
-        alpha = np.log(np.exp(np.clip(alpha, log_eps, -log_eps)) + 1.0) + 1.0
-
-        beta = _matmul(layer, self.weights['beta/W']) + self.weights['beta/b']
-        beta = np.log(np.exp(np.clip(beta, log_eps, -log_eps)) + 1.0) + 1.0
+        layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
+        layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
+        action = np.tanh(_matmul(layer, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0'])
 
         if not self.deterministic:
-            alpha = np.random.gamma(alpha)
-            beta = np.random.gamma(beta)
+            action = np.random.normal(action, self.weights['pi/pol/logstd:0'])
 
-        action = beta / np.maximum(alpha + beta, 1e-6)
         return action
 
     def compute_action(self, game_state):
@@ -175,36 +167,24 @@ class GameState:
             self.first_turn = False
 
     def extract_state(self):
-        complex_features_mask = 0.0
-        features = [len(self.checkpoints) * self.laps * complex_features_mask]
+        features = [len(self.checkpoints) * self.laps]
         for pod in self.pods:
             features += [
-                pod.x / 1000,
-                pod.y / 1000,
-                pod.vx / 1000,
-                pod.vy / 1000,
-                pod.angle / 360,
+                pod.x / 1000.0,
+                pod.y / 1000.0,
+                pod.vx / 1000.0,
+                pod.vy / 1000.0,
+                pod.angle / 360.0,
                 float(pod.boost_available),
-                pod.timeout / TIMEOUT * complex_features_mask,
-                pod.shield / 4,
-                pod.nb_checked(self) * complex_features_mask,
+                pod.timeout / TIMEOUT,
+                pod.shield / 4.0,
+                float(pod.nb_checked(self)),
             ]
             for i in range(3):
                 cp = pod.next_checkpoint(self, i)
                 features += [
-                    cp.x / 1000,
-                    cp.y / 1000,
-                ]
-        for i in range(6):
-            if i < len(self.checkpoints):
-                features += [
-                    self.checkpoints[i].x / 1000 * complex_features_mask,
-                    self.checkpoints[i].y / 1000 * complex_features_mask,
-                ]
-            else:
-                features += [
-                    0.0,
-                    0.0,
+                    cp.x / 1000.0,
+                    cp.y / 1000.0,
                 ]
         return features
 

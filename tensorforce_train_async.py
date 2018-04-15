@@ -19,7 +19,7 @@ import sys
 import tensorflow as tf
 from six.moves import shlex_quote
 
-import train_utils
+import tensorforce_train_utils
 
 
 def main():
@@ -145,7 +145,7 @@ def main():
         )
     )
 
-    train_utils.do_train(
+    tensorforce_train_utils.do_train(
         gym_id=args.gym_id,
         do_monitor=(args.task_index == 0),
         monitor_safe=args.monitor_safe,

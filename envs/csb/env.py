@@ -7,7 +7,7 @@ from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
 
-DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
+DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 1)))
 
 
 class CsbEnv(gym.Env):
@@ -15,15 +15,13 @@ class CsbEnv(gym.Env):
     reward_range = (-np.inf, np.inf)
     spec = None
 
-    opp_solution_predict = None
-
-    use_cp_dist_score = False
-    use_raw_rewards = False
-    versus_opponent_update_reward_threshold = 0.0
-
     def __init__(self):
         self.world = World()
         self.viewer = None
+
+        self.use_cp_dist_score = True
+        self.use_raw_rewards = False
+        self.opp_solution_predict = None
 
         self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(6,))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
@@ -53,7 +51,7 @@ class CsbEnv(gym.Env):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
 
-        if self.use_cp_dist_score:
+        if not self.use_raw_rewards:
             best_pod = max(self.world.pods[:2], key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
             current_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
             opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
@@ -61,7 +59,7 @@ class CsbEnv(gym.Env):
         agent_solution = self._action_to_solution(action)
 
         # Dummy solution : straight line toward the next checkpoint
-        if self.versus_opponent_update_reward_threshold == 0.0:
+        if self.opp_solution_predict is None:
             opp_solution = Solution(
                 move1=self.world.pods[2].to_dummy_move(speed=80.0),
                 move2=self.world.pods[3].to_dummy_move(speed=80.0),
@@ -70,7 +68,12 @@ class CsbEnv(gym.Env):
             opp_action = self.opp_solution_predict(self._get_state(opponent_view=True))
             opp_solution = self._action_to_solution(opp_action)
 
-        self.world.play(agent_solution, opp_solution)
+        safe_state = self._get_state()
+        try:
+            self.world.play(agent_solution, opp_solution)
+        except Exception as e:
+            print('An error occurred during game generation!', e)
+            return safe_state, 0.0, True, {}
 
         if self.world.player_won(1):
             episode_over = True
@@ -101,18 +104,9 @@ class CsbEnv(gym.Env):
         self.viewer, rendered = self.world.render(viewer=self.viewer, mode=mode)
         return rendered
 
+    def switch_to_hard_env(self):
+        self.use_cp_dist_score = False
+        self.use_raw_rewards = True
 
-class CsbEnvD0V1(CsbEnv):
-    use_cp_dist_score = True
-    use_raw_rewards = False
-
-
-class CsbEnvD1V1(CsbEnv):
-    use_cp_dist_score = False
-    use_raw_rewards = True
-
-
-class CsbEnvVersusV1(CsbEnv):
-    use_cp_dist_score = False
-    use_raw_rewards = True
-    versus_opponent_update_reward_threshold = 2.0  # 60% of games won
+    def enable_opponent(self, opp_solution_predict):
+        self.opp_solution_predict = opp_solution_predict
