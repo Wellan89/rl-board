@@ -150,7 +150,7 @@ class Pod(Unit):
     def to_dummy_move(self, speed):
         return Move(
             g1=CLAMP(LIN(self.diffAngle(self.world.circuit.cp(self.ncpid)), -18.0, 0.1, 18.0, 0.9), 0.1, 0.9),
-            g2=speed,
+            g2=CLAMP(LIN(speed, 0.0, 0.1, MAX_THRUST, 0.9), 0.1, 0.9),
             g3=0.5
         )
 

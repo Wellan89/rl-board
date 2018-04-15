@@ -15,10 +15,10 @@ class World:
         self.nblaps = 3
         self.turn = 0
 
-        distance_to_center = random.choice([500, 1500])
+        distance_to_center = 500.0 if random.random() < 0.5 else 1500.0
         cp0x = self.circuit.cp(0).x
         cp0y = self.circuit.cp(0).y
-        angle = math.pi / 2 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
+        angle = math.pi / 2.0 + math.atan2(self.circuit.cp(1).y - cp0y, self.circuit.cp(1).x - cp0x)
         cos_angle = math.cos(angle)
         sin_angle = math.sin(angle)
         self.pods = [
@@ -26,13 +26,13 @@ class World:
                 cp0y + sin_angle * distance_to_center, self),
             Pod(1, cp0x - cos_angle * distance_to_center,
                 cp0y - sin_angle * distance_to_center, self),
-            Pod(2, cp0x + cos_angle * (2000 - distance_to_center),
-                cp0y + sin_angle * (2000 - distance_to_center), self),
-            Pod(3, cp0x - cos_angle * (2000 - distance_to_center),
-                cp0y - sin_angle * (2000 - distance_to_center), self),
+            Pod(2, cp0x + cos_angle * (2000.0 - distance_to_center),
+                cp0y + sin_angle * (2000.0 - distance_to_center), self),
+            Pod(3, cp0x - cos_angle * (2000.0 - distance_to_center),
+                cp0y - sin_angle * (2000.0 - distance_to_center), self),
         ]
         for pod in self.pods:
-            pod.angle = angle - math.pi / 2
+            pod.angle = angle - math.pi / 2.0
 
     def play(self, s1, s2):
 
@@ -86,15 +86,15 @@ class World:
         for pod in self.pods:
             pod.end()
 
-    def player_won(self, player, enable_timeout=True):
-        assert player == 0 or player == 1
+    def player_won(self, player):
+        # assert player == 0 or player == 1
 
         # Race finished
         if self.pods[player*2].lap == self.nblaps or self.pods[player*2+1].lap == self.nblaps:
             return True
 
         # Opponent timeout
-        if enable_timeout and self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0:
+        if self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0:
             return True
 
         if self.turn > 900:

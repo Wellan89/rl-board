@@ -1,30 +1,15 @@
 from gym.envs.registration import register
 
+
 register(
-    id='csb-d0-v0',
-    entry_point='envs.csb.env:CsbEnvD0V0',
+    id='csb-d0-v1',
+    entry_point='envs.csb.env:CsbEnvD0V1',
 )
 register(
-    id='csb-d1-v0',
-    entry_point='envs.csb.env:CsbEnvD1V0',
+    id='csb-d1-v1',
+    entry_point='envs.csb.env:CsbEnvD1V1',
 )
 register(
-    id='csb-d2-v0',
-    entry_point='envs.csb.env:CsbEnvD2V0',
-)
-register(
-    id='csb-d3-v0',
-    entry_point='envs.csb.env:CsbEnvD3V0',
-)
-register(
-    id='csb-d4-v0',
-    entry_point='envs.csb.env:CsbEnvD4V0',
-)
-register(
-    id='csb-d5-v0',
-    entry_point='envs.csb.env:CsbEnvD5V0',
-)
-register(
-    id='csb-versus-v0',
-    entry_point='envs.csb.env:CsbEnvVersusV0',
+    id='csb-versus-v1',
+    entry_point='envs.csb.env:CsbEnvVersusV1',
 )

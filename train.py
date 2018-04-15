@@ -1,45 +1,61 @@
 import argparse
+import os.path as osp
 
-import train_utils
+import gym
+import numpy as np
+from mpi4py import MPI
+from baselines import bench
+from baselines import logger
+from baselines.common import tf_util as U
+from baselines.ppo1 import pposgd_simple, mlp_policy
+
+import envs
 
 
-# python train.py csb-d0-v0 -a agents/trpo-v1.json -n networks/mlp-v1.json
+def train(env_id):
+    rank = MPI.COMM_WORLD.Get_rank()
+    sess = U.single_threaded_session()
+    sess.__enter__()
+    if rank == 0:
+        logger.configure()
+    else:
+        logger.configure(format_strs=[])
+
+    env = gym.make(env_id)
+
+    def policy_fn(name, ob_space, ac_space):
+        return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                                    hid_size=64, num_hid_layers=2)
+
+    env = bench.Monitor(env, logger.get_dir() and osp.join(logger.get_dir(), str(rank)))
+
+    def save_fn(local_vars, global_vars):
+        if rank != 0:
+            return
+        vars_list = local_vars['var_list']
+        vars_values = sess.run(vars_list)
+        vars_dict = {var_name.name: np.array(var_value) for var_name, var_value in zip(vars_list, vars_values)}
+        np.savez_compressed('./model.npz', **vars_dict)
+
+    pposgd_simple.learn(
+        env, policy_fn,
+        max_episodes=1000000000,
+        timesteps_per_actorbatch=200 * 300,
+        clip_param=0.2, entcoeff=0.0,
+        optim_epochs=10, optim_stepsize=1e-3, optim_batchsize=256,
+        gamma=0.99, lam=0.95, schedule='constant',
+        callback=save_fn
+    )
+    env.close()
 
 
 def main():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('gym_id', help="Id of the Gym environment")
-    parser.add_argument('-a', '--agent', help="Agent configuration file")
-    parser.add_argument('-n', '--network', default=None, help="Network specification file")
-    parser.add_argument('-e', '--episodes', type=int, default=None, help="Number of episodes")
-    parser.add_argument('-t', '--timesteps', type=int, default=None, help="Number of timesteps")
-    parser.add_argument('-m', '--max-episode-timesteps', type=int, default=None, help="Maximum number of timesteps per episode")
-    parser.add_argument('-d', '--deterministic', action='store_true', default=False, help="Choose actions deterministically")
-    parser.add_argument('-l', '--load', default=None, help="Load agent from a previous checkpoint")
-    parser.add_argument('--monitor', help="Save results to this directory")
-    parser.add_argument('--monitor-safe', action='store_true', default=False, help="Do not overwrite previous results")
-    parser.add_argument('--monitor-video', type=int, default=1000, help="Save video every x steps (0 = disabled)")
-    parser.add_argument('-D', '--debug', action='store_true', default=False, help="Show debug outputs")
-
+    parser.add_argument('gym_id')
     args = parser.parse_args()
 
-    train_utils.do_train(
-        gym_id=args.gym_id,
-        do_monitor=True,
-        monitor_safe=args.monitor_safe,
-        monitor_video=args.monitor_video,
-        agent_path=args.agent,
-        agent_kwargs={},
-        network_path=args.network,
-        debug=args.debug,
-        timesteps=args.timesteps,
-        episodes=args.episodes,
-        max_episode_timesteps=args.max_episode_timesteps,
-        deterministic=args.deterministic,
-        load_path=args.load,
-        task_index=None,
-    )
+    train(args.gym_id)
+
 
 
 if __name__ == '__main__':

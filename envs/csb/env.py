@@ -19,10 +19,6 @@ class CsbEnv(gym.Env):
 
     use_cp_dist_score = False
     use_raw_rewards = False
-    use_negative_rewards = False
-    use_timed_features_mask = False
-    use_complex_features_mask = False
-    dummy_opponent_speed = 0.0
     versus_opponent_update_reward_threshold = 0.0
 
     def __init__(self):
@@ -39,11 +35,9 @@ class CsbEnv(gym.Env):
         else:
             pods = world.pods
 
-        state = observation.observation(world, pods,
-                                        use_timed_features_mask=self.use_timed_features_mask,
-                                        use_complex_features_mask=self.use_complex_features_mask)
+        state = observation.observation(world, pods)
         # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
-        return state
+        return np.array(state)
 
     def _get_state(self, opponent_view=False):
         return self.compute_custom_state(self.world, opponent_view=opponent_view)
@@ -59,17 +53,18 @@ class CsbEnv(gym.Env):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
 
-        best_pod = max(self.world.pods[:2], key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
-        current_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-        opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
+        if self.use_cp_dist_score:
+            best_pod = max(self.world.pods[:2], key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
+            current_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+            opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
 
         agent_solution = self._action_to_solution(action)
 
         # Dummy solution : straight line toward the next checkpoint
         if self.versus_opponent_update_reward_threshold == 0.0:
             opp_solution = Solution(
-                move1=self.world.pods[2].to_dummy_move(speed=self.dummy_opponent_speed),
-                move2=self.world.pods[3].to_dummy_move(speed=self.dummy_opponent_speed),
+                move1=self.world.pods[2].to_dummy_move(speed=80.0),
+                move2=self.world.pods[3].to_dummy_move(speed=80.0),
             )
         else:
             opp_action = self.opp_solution_predict(self._get_state(opponent_view=True))
@@ -77,24 +72,23 @@ class CsbEnv(gym.Env):
 
         self.world.play(agent_solution, opp_solution)
 
-        enable_timeout = (self.dummy_opponent_speed > 0.0 or self.versus_opponent_update_reward_threshold != 0.0)
-        if self.world.player_won(1, enable_timeout=enable_timeout):
+        if self.world.player_won(1):
             episode_over = True
-            reward = 0.0 if not self.use_negative_rewards else -10.0
-        elif self.world.player_won(0, enable_timeout=enable_timeout):
+            reward = 0.0 if not self.use_raw_rewards else -10.0
+        elif self.world.player_won(0):
             episode_over = True
-            reward = 20.0 if not self.use_negative_rewards else 10.0
+            reward = 20.0 if not self.use_raw_rewards else 10.0
         else:
+            episode_over = False
             if not self.use_raw_rewards:
                 now_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
                 opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
                 reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
             else:
                 reward = 0.0
-            episode_over = False if enable_timeout else (self.world.turn > 500)
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
-        return self._get_state(), reward, episode_over, None
+        return self._get_state(), reward, episode_over, {}
 
     def reset(self):
         self.world = World()
@@ -108,48 +102,17 @@ class CsbEnv(gym.Env):
         return rendered
 
 
-class CsbEnvD0V0(CsbEnv):
+class CsbEnvD0V1(CsbEnv):
     use_cp_dist_score = True
-    use_timed_features_mask = True
-    dummy_opponent_speed = 0.0
+    use_raw_rewards = False
 
 
-class CsbEnvD1V0(CsbEnv):
-    use_cp_dist_score = True
-    dummy_opponent_speed = 0.1
-
-
-class CsbEnvD2V0(CsbEnv):
-    use_cp_dist_score = True
-    dummy_opponent_speed = 0.4
-
-
-class CsbEnvD3V0(CsbEnv):
-    use_cp_dist_score = True
-    use_complex_features_mask = True
-    dummy_opponent_speed = 0.4
-
-
-class CsbEnvD4V0(CsbEnv):
+class CsbEnvD1V1(CsbEnv):
     use_cp_dist_score = False
     use_raw_rewards = True
-    use_negative_rewards = True
-    use_complex_features_mask = True
-    dummy_opponent_speed = 0.4
 
 
-class CsbEnvD5V0(CsbEnv):
+class CsbEnvVersusV1(CsbEnv):
     use_cp_dist_score = False
     use_raw_rewards = True
-    use_negative_rewards = True
-    use_complex_features_mask = False
-    dummy_opponent_speed = 0.4
-
-
-class CsbEnvVersusV0(CsbEnv):
-    use_cp_dist_score = False
-    use_raw_rewards = True
-    use_negative_rewards = True
-    use_complex_features_mask = True
-    dummy_opponent_speed = 0.0
     versus_opponent_update_reward_threshold = 2.0  # 60% of games won
