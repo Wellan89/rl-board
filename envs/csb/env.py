@@ -60,14 +60,17 @@ class CsbEnv(gym.Env):
 
         agent_solution = self._action_to_solution(action)
 
+        opp_action = None
+        if self.opp_solution_predict is not None:
+            opp_action = self.opp_solution_predict(self._get_state(opponent_view=True))
+
         # Dummy solution : straight line toward the next checkpoint
-        if self.opp_solution_predict is None:
+        if opp_action is None:
             opp_solution = Solution(
                 move1=self.world.pods[2].to_dummy_move(speed=80.0),
                 move2=self.world.pods[3].to_dummy_move(speed=80.0),
             )
         else:
-            opp_action = self.opp_solution_predict(self._get_state(opponent_view=True))
             opp_solution = self._action_to_solution(opp_action)
 
         safe_state = self._get_state()

@@ -31,13 +31,13 @@ class Model:
     def from_data(cls, model_data):
         weights = {
             var: np.reshape(
-                np.fromstring(base64.decodebytes(data.encode()), dtype=dtype).astype(np.float32), shape
+                np.fromstring(base64.decodebytes(data.encode()), dtype=dtype).astype(np.float64), shape
             ) for var, (shape, dtype, data) in model_data.items()
         }
         return cls(weights=weights)
 
     def predict(self, state):
-        layer = np.array(state, dtype=np.float32)
+        layer = np.array(state, dtype=np.float64)
         state_mean = self.weights['pi/obfilter/runningsum:0'] / self.weights['pi/obfilter/count:0']
         state_std = np.sqrt(np.maximum(
             (self.weights['pi/obfilter/runningsumsq:0'] / self.weights['pi/obfilter/count:0']) - np.square(state_mean),

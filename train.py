@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import os
+import random
 
 import gym
 import numpy as np
@@ -54,18 +55,19 @@ class HardEnvCallback:
 class VersusCallback:
     def __init__(self, env, start_iterations, threshold_iterations, opp_update_reward_threshold):
         self.env = env.unwrapped
+        self.env.enable_opponent(self.predict)
         self.start_iterations = start_iterations
         self.threshold_iterations = threshold_iterations
         self.opp_update_reward_threshold = opp_update_reward_threshold
         self.latest_rewards = []
-        self.model = None
+        self.models = [None]  # This model is the default AI in the environment
 
     def __call__(self, local_vars, global_vars):
         if local_vars['iters_so_far'] < self.start_iterations:
             return
 
-        if not self.model:
-            print('Loading opponent')
+        if not self.models:
+            print('Loading first opponent')
             self.reload(local_vars)
             return
 
@@ -77,18 +79,21 @@ class VersusCallback:
         if average_reward < self.opp_update_reward_threshold:
             del self.latest_rewards[0]
         else:
-            print('VersusCallback: Reloading opponent: average reward is {:.2f} over the last {} iterations'.format(
-                average_reward, len(self.latest_rewards)
+            print('VersusCallback: Loading opponent {}: average reward is {:.2f} over the last {} iterations'.format(
+                len(self.models), average_reward, len(self.latest_rewards)
             ))
             self.reload(local_vars)
 
     def reload(self, local_vars):
         self.latest_rewards = []
-        self.model = csb.Model(_load_vars_dict(local_vars))
-        self.env.enable_opponent(self.predict)
+        self.models.append(csb.Model(_load_vars_dict(local_vars)))
 
     def predict(self, state):
-        return self.model.predict(state)
+        model = random.choice(self.models)
+        if model:
+            return model.predict(state)
+        else:
+            return None
 
 
 class ReloadCallback:
@@ -128,8 +133,8 @@ def main():
     callbacks = [
         ReloadCallback(model_path=args.load),
         SaveCallback(rank=rank, log_dir=log_dir),
-        HardEnvCallback(env=env, switch_iterations=70),
-        VersusCallback(env=env, start_iterations=100, threshold_iterations=5, opp_update_reward_threshold=2.0),
+        HardEnvCallback(env=env, switch_iterations=100),
+        VersusCallback(env=env, start_iterations=30, threshold_iterations=10, opp_update_reward_threshold=2.0),
     ]
     pposgd_simple.learn(
         env, policy_fn, max_iters=1000000,
