@@ -141,7 +141,7 @@ class World:
             color = (float(pod.id >= 2), float(pod.id < 2), 0.0)
             if pod.shield > 0:
                 viewer.draw_circle(color=(0.0, 0.0, 0.6),
-                                        radius=pod_radius + _radius_to_screen(20 * pod.shield)).add_attr(
+                                   radius=pod_radius + _radius_to_screen(20 * pod.shield)).add_attr(
                     rendering.Transform(translation=_pos_to_screen(pod))
                 )
             viewer.draw_circle(color=color, radius=pod_radius).add_attr(
@@ -149,7 +149,7 @@ class World:
             )
             if pod.boost_available:
                 viewer.draw_circle(color=(0.0, 0.0, 0.0),
-                                        radius=_radius_to_screen(80)).add_attr(
+                                   radius=_radius_to_screen(80)).add_attr(
                     rendering.Transform(translation=_pos_to_screen(pod))
                 )
             viewer.draw_line(

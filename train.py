@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 import random
+import threading
 
 import gym
 import numpy as np
@@ -24,14 +25,17 @@ def _load_vars_dict(local_vars):
 
 
 class SaveCallback:
-    def __init__(self, rank, log_dir):
-        self.rank = rank
+    def __init__(self, log_dir):
         self.log_dir = log_dir
 
-    def __call__(self, local_vars, global_vars):
-        filename = os.path.join(self.log_dir, 'model_{}.npz'.format(self.rank))
+    def _save(self, filename, vars_dict):
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        np.savez_compressed(filename, **_load_vars_dict(local_vars))
+        np.savez_compressed(filename, **vars_dict)
+
+    def __call__(self, local_vars, global_vars):
+        vars_dict = _load_vars_dict(local_vars)
+        self._save(os.path.join(self.log_dir, 'model.npz'), vars_dict)
+        self._save(os.path.join(self.log_dir, 'checkpoints/model_{}.npz'.format(local_vars['iters_so_far'])), vars_dict)
 
 
 class HardEnvCallback:
@@ -111,6 +115,38 @@ class ReloadCallback:
         self.model_path = None
 
 
+# Two wrappers for the same environment needs to have a different name
+class VideoMonitor(gym.wrappers.Monitor):
+    pass
+
+
+class VideoMonitorCallback:
+    def __init__(self, gym_id, log_dir, frequency_iters):
+        self.gym_id = gym_id
+        self.log_dir = log_dir
+        self.frequency_iters = frequency_iters
+
+    def _do_monitor(self, monitor_path, model):
+        print('Recording run to:', monitor_path)
+        env = VideoMonitor(gym.make(self.gym_id), monitor_path, video_callable=lambda _: True)
+        state = env.reset()
+        while True:
+            action = model.predict(state)
+            state, _, terminal, _ = env.step(action)
+            if terminal:
+                break
+        env.close()
+        print('Recorded run to:', monitor_path)
+
+    def __call__(self, local_vars, global_vars):
+        if local_vars['iters_so_far'] % self.frequency_iters != 0:
+            return
+
+        monitor_path = os.path.join(self.log_dir, 'video_monitor/{}'.format(local_vars['iters_so_far']))
+        model = csb.Model(_load_vars_dict(local_vars))
+        threading.Thread(target=self._do_monitor, args=(monitor_path, model)).start()
+
+
 def policy_fn(name, ob_space, ac_space):
     return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=80, num_hid_layers=2)
 
@@ -130,15 +166,27 @@ def main():
 
     env = bench.Monitor(gym.make(args.gym_id), os.path.join(logger.get_dir(), str(rank)))
 
+    episodes_per_actorbatch = 2000 // size
+    timesteps_per_actorbatch = episodes_per_actorbatch * 250
+
+    if rank == 0:
+        monitor_path = os.path.join(log_dir, 'monitor')
+        monitor_video = episodes_per_actorbatch
+        env = VideoMonitor(env, monitor_path, video_callable=lambda x: x % monitor_video == 0)
+
     callbacks = [
         ReloadCallback(model_path=args.load),
-        SaveCallback(rank=rank, log_dir=log_dir),
-        HardEnvCallback(env=env, switch_iterations=100),
-        VersusCallback(env=env, start_iterations=30, threshold_iterations=10, opp_update_reward_threshold=2.0),
+        HardEnvCallback(env=env, switch_iterations=50),
+        VersusCallback(env=env, start_iterations=70, threshold_iterations=10, opp_update_reward_threshold=2.0),
     ]
+    if rank == 0:
+        callbacks += [
+            SaveCallback(log_dir=log_dir),
+            # VideoMonitorCallback(gym_id=args.gym_id, log_dir=log_dir, frequency_iters=1),
+        ]
     pposgd_simple.learn(
         env, policy_fn, max_iters=1000000,
-        timesteps_per_actorbatch=2000 * 300 // size,
+        timesteps_per_actorbatch=timesteps_per_actorbatch,
         clip_param=0.2, entcoeff=0.0,
         optim_epochs=10, optim_stepsize=1e-3, optim_batchsize=256,
         gamma=0.99, lam=0.95, schedule='constant',

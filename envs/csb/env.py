@@ -7,7 +7,7 @@ from envs.csb.world import World
 from envs.csb.solution import Solution
 from envs.csb.move import Move
 
-DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 1)))
+DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
 
 
 class CsbEnv(gym.Env):
@@ -115,3 +115,13 @@ class CsbEnv(gym.Env):
 
     def enable_opponent(self, opp_solution_predict):
         self.opp_solution_predict = opp_solution_predict
+
+
+class CsbEnvD0(CsbEnv):
+    pass
+
+
+class CsbEnvD1(CsbEnv):
+    def __init__(self):
+        super().__init__()
+        self.switch_to_hard_env()
