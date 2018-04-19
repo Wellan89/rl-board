@@ -57,22 +57,28 @@ class HardEnvCallback:
 
 
 class VersusCallback:
-    def __init__(self, env, start_iterations, threshold_iterations, opp_update_reward_threshold):
+    def __init__(self, env, start_iterations, threshold_iterations,
+                 opp_update_reward_threshold, default_ai_weight):
         self.env = env.unwrapped
         self.env.enable_opponent(self.predict)
         self.start_iterations = start_iterations
         self.threshold_iterations = threshold_iterations
         self.opp_update_reward_threshold = opp_update_reward_threshold
         self.latest_rewards = []
-        self.models = [None]  # This model is the default AI in the environment
+        self.models = []
+        self.current_model = None
+
+        if default_ai_weight > 0:
+            # This model is the default AI in the environment
+            self.models += [None] * default_ai_weight
 
     def __call__(self, local_vars, global_vars):
-        if local_vars['iters_so_far'] < self.start_iterations:
+        if not self.models:
+            # Load the first model
+            self.reload(local_vars)
             return
 
-        if not self.models:
-            print('Loading first opponent')
-            self.reload(local_vars)
+        if 'rews' not in local_vars or local_vars['iters_so_far'] < self.start_iterations:
             return
 
         self.latest_rewards.append(sum(local_vars['rews']) / len(local_vars['rews']))
@@ -80,7 +86,7 @@ class VersusCallback:
             return
 
         average_reward = sum(self.latest_rewards) / len(self.latest_rewards)
-        if average_reward < self.opp_update_reward_threshold:
+        if self.opp_update_reward_threshold is not None and average_reward < self.opp_update_reward_threshold:
             del self.latest_rewards[0]
         else:
             print('VersusCallback: Loading opponent {}: average reward is {:.2f} over the last {} iterations'.format(
@@ -92,10 +98,12 @@ class VersusCallback:
         self.latest_rewards = []
         self.models.append(csb.Model(_load_vars_dict(local_vars)))
 
-    def predict(self, state):
-        model = random.choice(self.models)
-        if model:
-            return model.predict(state)
+    def predict(self, state, is_new_episode):
+        if is_new_episode:
+            self.current_model = random.choice(self.models)
+
+        if self.current_model:
+            return self.current_model.predict(state)
         else:
             return None
 
@@ -176,8 +184,9 @@ def main():
 
     callbacks = [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=50),
-        VersusCallback(env=env, start_iterations=70, threshold_iterations=10, opp_update_reward_threshold=2.0),
+        HardEnvCallback(env=env, switch_iterations=100),
+        VersusCallback(env=env, start_iterations=0, threshold_iterations=20,
+                       opp_update_reward_threshold=None, default_ai_weight=3),
     ]
     if rank == 0:
         callbacks += [

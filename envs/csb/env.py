@@ -17,6 +17,7 @@ class CsbEnv(gym.Env):
 
     def __init__(self):
         self.world = World()
+        self.is_new_episode = True
         self.viewer = None
 
         self.use_cp_dist_score = True
@@ -26,6 +27,11 @@ class CsbEnv(gym.Env):
         self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(6,))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
                                                 shape=(len(self._get_state()),))
+
+    def reset(self):
+        self.world = World()
+        self.is_new_episode = True
+        return self._get_state()
 
     def compute_custom_state(self, world, opponent_view=False):
         if opponent_view:
@@ -62,7 +68,7 @@ class CsbEnv(gym.Env):
 
         opp_action = None
         if self.opp_solution_predict is not None:
-            opp_action = self.opp_solution_predict(self._get_state(opponent_view=True))
+            opp_action = self.opp_solution_predict(self._get_state(opponent_view=True), self.is_new_episode)
 
         # Dummy solution : straight line toward the next checkpoint
         if opp_action is None:
@@ -72,6 +78,7 @@ class CsbEnv(gym.Env):
             )
         else:
             opp_solution = self._action_to_solution(opp_action)
+        self.is_new_episode = False
 
         safe_state = self._get_state()
         try:
@@ -97,10 +104,6 @@ class CsbEnv(gym.Env):
 
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, {}
-
-    def reset(self):
-        self.world = World()
-        return self._get_state()
 
     def render(self, mode='human'):
         if DISABLE_RENDERING:
