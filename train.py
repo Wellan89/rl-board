@@ -1,4 +1,5 @@
 import argparse
+import collections
 import datetime
 import os
 import random
@@ -39,21 +40,24 @@ class SaveCallback:
 
 
 class HardEnvCallback:
-    def __init__(self, env, switch_iterations):
+    def __init__(self, env, switch_iterations, linear_schedule):
         self.env = env.unwrapped
         self.switch_iterations = switch_iterations
+        self.linear_schedule = linear_schedule
+        self.printed = False
 
     def __call__(self, local_vars, global_vars):
-        if self.switch_iterations is None or local_vars['iters_so_far'] < self.switch_iterations:
-            return
+        if self.linear_schedule:
+            hard_env_weight = min(local_vars['iters_so_far'] / self.switch_iterations, 1.0)
+        else:
+            hard_env_weight = float(local_vars['iters_so_far'] >= self.switch_iterations)
 
-        print('HardEnvCallback: {} iterations done:'
-              ' switching to hard environment version'.format(local_vars['iters_so_far']))
-        self.switch_iterations = None
-        try:
-            self.env.switch_to_hard_env()
-        except Exception as e:
-            print('HardEnvCallback: Error: could not switch to hard environment:', e)
+        if not self.printed and hard_env_weight >= 1.0:
+            print('HardEnvCallback: {} iterations done:'
+                  ' done switching to hard environment version'.format(local_vars['iters_so_far']))
+            self.printed = True
+
+        self.env.set_hard_env_weight(hard_env_weight)
 
 
 class VersusCallback:
@@ -64,7 +68,7 @@ class VersusCallback:
         self.start_iterations = start_iterations
         self.threshold_iterations = threshold_iterations
         self.opp_update_reward_threshold = opp_update_reward_threshold
-        self.latest_rewards = []
+        self.latest_rewards = collections.deque(maxlen=threshold_iterations)
         self.models = []
         self.current_model = None
 
@@ -86,16 +90,14 @@ class VersusCallback:
             return
 
         average_reward = sum(self.latest_rewards) / len(self.latest_rewards)
-        if self.opp_update_reward_threshold is not None and average_reward < self.opp_update_reward_threshold:
-            del self.latest_rewards[0]
-        else:
+        if self.opp_update_reward_threshold is None or average_reward >= self.opp_update_reward_threshold:
             print('VersusCallback: Loading opponent {}: average reward is {:.2f} over the last {} iterations'.format(
                 len(self.models), average_reward, len(self.latest_rewards)
             ))
             self.reload(local_vars)
+            self.latest_rewards.clear()
 
     def reload(self, local_vars):
-        self.latest_rewards = []
         self.models.append(csb.Model(_load_vars_dict(local_vars)))
 
     def predict(self, state, is_new_episode):
@@ -117,7 +119,7 @@ class ReloadCallback:
             return
 
         print('Restoring from:', self.model_path)
-        vars_dict = {var.name: var for var in local_vars['var_list']}
+        vars_dict = {var.name: var for var in local_vars['pi'].get_variables()}
         for var_name, var_value in checkpoints_utils.read_weights(self.model_path).items():
             vars_dict[var_name].assign(var_value)
         self.model_path = None
@@ -163,6 +165,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('gym_id')
     parser.add_argument('-l', '--load')
+    parser.add_argument('-e', '--episodes-per-batch', type=int, default=2000)
     args = parser.parse_args()
 
     rank = MPI.COMM_WORLD.Get_rank()
@@ -174,7 +177,7 @@ def main():
 
     env = bench.Monitor(gym.make(args.gym_id), os.path.join(logger.get_dir(), str(rank)))
 
-    episodes_per_actorbatch = 2000 // size
+    episodes_per_actorbatch = args.episodes_per_batch // size
     timesteps_per_actorbatch = episodes_per_actorbatch * 250
 
     if rank == 0:
@@ -184,9 +187,9 @@ def main():
 
     callbacks = [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=100),
-        VersusCallback(env=env, start_iterations=0, threshold_iterations=20,
-                       opp_update_reward_threshold=None, default_ai_weight=3),
+        HardEnvCallback(env=env, switch_iterations=100, linear_schedule=True),
+        VersusCallback(env=env, start_iterations=0, threshold_iterations=40,
+                       opp_update_reward_threshold=None, default_ai_weight=1),
     ]
     if rank == 0:
         callbacks += [
@@ -194,7 +197,7 @@ def main():
             # VideoMonitorCallback(gym_id=args.gym_id, log_dir=log_dir, frequency_iters=1),
         ]
     pposgd_simple.learn(
-        env, policy_fn, max_iters=1000000,
+        env, policy_fn, max_iters=10000,
         timesteps_per_actorbatch=timesteps_per_actorbatch,
         clip_param=0.2, entcoeff=0.0,
         optim_epochs=10, optim_stepsize=1e-3, optim_batchsize=256,

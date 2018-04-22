@@ -21,7 +21,7 @@ class CsbEnv(gym.Env):
         self.viewer = None
 
         self.use_cp_dist_score = True
-        self.use_raw_rewards = False
+        self.raw_rewards_weight = 0.0
         self.opp_solution_predict = None
 
         self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(6,))
@@ -56,19 +56,21 @@ class CsbEnv(gym.Env):
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
-
         action = np.clip(action, 0.0, 1.0)
-
-        if not self.use_raw_rewards:
-            best_pod = max(self.world.pods[:2], key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
-            current_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-            opp_current_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
-
         agent_solution = self._action_to_solution(action)
+
+        block_pod, run_pod = self.world.pods[:2]
+        opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
+                                            key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
+        opp_next_cp = opp_run_pod.next_checkpoint(self.world)
+        current_score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+        current_score -= block_pod.distance(opp_next_cp) / 5000.0
+        opp_current_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
 
         opp_action = None
         if self.opp_solution_predict is not None:
             opp_action = self.opp_solution_predict(self._get_state(opponent_view=True), self.is_new_episode)
+        self.is_new_episode = False
 
         # Dummy solution : straight line toward the next checkpoint
         if opp_action is None:
@@ -78,7 +80,6 @@ class CsbEnv(gym.Env):
             )
         else:
             opp_solution = self._action_to_solution(opp_action)
-        self.is_new_episode = False
 
         safe_state = self._get_state()
         try:
@@ -89,19 +90,23 @@ class CsbEnv(gym.Env):
 
         if self.world.player_won(1):
             episode_over = True
-            reward = 0.0 if not self.use_raw_rewards else -10.0
+            easy_reward = 0.0
+            raw_reward = -10.0
         elif self.world.player_won(0):
             episode_over = True
-            reward = 20.0 if not self.use_raw_rewards else 10.0
+            easy_reward = 20.0
+            raw_reward = 10.0
         else:
             episode_over = False
-            if not self.use_raw_rewards:
-                now_score = best_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-                opp_now_score = max(pod.score(use_cp_dist_score=self.use_cp_dist_score) for pod in self.world.pods[2:])
-                reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
-            else:
-                reward = 0.0
 
+            now_score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+            now_score -= block_pod.distance(opp_next_cp) / 5000.0
+            opp_now_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+            easy_reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
+
+            raw_reward = 0.0
+
+        reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return self._get_state(), reward, episode_over, {}
 
@@ -112,9 +117,9 @@ class CsbEnv(gym.Env):
         self.viewer, rendered = self.world.render(viewer=self.viewer, mode=mode)
         return rendered
 
-    def switch_to_hard_env(self):
-        self.use_cp_dist_score = False
-        self.use_raw_rewards = True
+    def set_hard_env_weight(self, weight):
+        assert 0.0 <= weight <= 1.0
+        self.raw_rewards_weight = weight
 
     def enable_opponent(self, opp_solution_predict):
         self.opp_solution_predict = opp_solution_predict
@@ -127,4 +132,4 @@ class CsbEnvD0(CsbEnv):
 class CsbEnvD1(CsbEnv):
     def __init__(self):
         super().__init__()
-        self.switch_to_hard_env()
+        self.set_hard_env_weight(weight=1.0)
