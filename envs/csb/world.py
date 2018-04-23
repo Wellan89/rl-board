@@ -4,6 +4,7 @@ import math
 from envs.csb.collision import Collision
 from envs.csb.circuit import Circuit
 from envs.csb.pod import Pod
+from envs.csb.vincent_algo import Pos
 
 
 class World:
@@ -155,7 +156,14 @@ class World:
             viewer.draw_line(
                 color=color,
                 start=_pos_to_screen(pod),
-                end=_pos_to_screen(pod.next_checkpoint(self)),
+                end=_pos_to_screen(pod.next_checkpoint()),
+            )
+            pod_angle_rad = pod.angle * math.pi / 180.0
+            viewer.draw_line(
+                color=(0.0, 0.0, 0.0),
+                start=_pos_to_screen(pod),
+                end=_pos_to_screen(Pos(pod.x + 300.0 * math.cos(pod_angle_rad),
+                                       pod.y + 300.0 * math.sin(pod_angle_rad))),
             )
 
         return viewer, viewer.render(return_rgb_array=(mode == 'rgb_array'))

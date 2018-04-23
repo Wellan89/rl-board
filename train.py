@@ -121,13 +121,26 @@ class ReloadCallback:
         print('Restoring from:', self.model_path)
         vars_dict = {var.name: var for var in local_vars['pi'].get_variables()}
         for var_name, var_value in checkpoints_utils.read_weights(self.model_path).items():
-            vars_dict[var_name].assign(var_value)
+            vars_dict[var_name].load(var_value)
         self.model_path = None
 
 
 # Two wrappers for the same environment needs to have a different name
 class VideoMonitor(gym.wrappers.Monitor):
     pass
+
+
+class VideoEpisodesMonitorCallback:
+    def __init__(self):
+        self._should_monitor = True
+
+    def __call__(self, local_vars, global_vars):
+        self._should_monitor = True
+
+    def should_monitor(self, episode_idx):
+        ret = self._should_monitor
+        self._should_monitor = False
+        return ret
 
 
 class VideoMonitorCallback:
@@ -180,16 +193,18 @@ def main():
     episodes_per_actorbatch = args.episodes_per_batch // size
     timesteps_per_actorbatch = episodes_per_actorbatch * 250
 
+    callbacks = []
     if rank == 0:
+        video_episodes_monitor_callback = VideoEpisodesMonitorCallback()
+        callbacks.append(video_episodes_monitor_callback)
         monitor_path = os.path.join(log_dir, 'monitor')
-        monitor_video = episodes_per_actorbatch
-        env = VideoMonitor(env, monitor_path, video_callable=lambda x: x % monitor_video == 0)
+        env = VideoMonitor(env, monitor_path, video_callable=video_episodes_monitor_callback.should_monitor)
 
-    callbacks = [
+    callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=100, linear_schedule=True),
-        VersusCallback(env=env, start_iterations=0, threshold_iterations=40,
-                       opp_update_reward_threshold=None, default_ai_weight=1),
+        HardEnvCallback(env=env, switch_iterations=200, linear_schedule=True),
+        VersusCallback(env=env, start_iterations=0, threshold_iterations=20,
+                       opp_update_reward_threshold=None, default_ai_weight=3),
     ]
     if rank == 0:
         callbacks += [

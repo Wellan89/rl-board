@@ -1,6 +1,3 @@
-from envs.csb import util
-
-
 def observation(world, pods):
     features = [world.circuit.nbcp() * world.nblaps]
     for pod in pods:
@@ -16,7 +13,7 @@ def observation(world, pods):
             float(pod.nbChecked()),
         ]
         for i in range(3):
-            cp = pod.next_checkpoint(world, i)
+            cp = pod.next_checkpoint(i)
             features += [
                 cp.x / 1000.0,
                 cp.y / 1000.0,

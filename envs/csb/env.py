@@ -53,19 +53,21 @@ class CsbEnv(gym.Env):
             move2=Move(g1=action[3], g2=action[4], g3=action[5]),
         )
 
+    def _compute_score(self):
+        block_pod, run_pod = self.world.pods[:2]
+        opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
+                                            key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
+        score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score) + block_pod.block_score(opp_run_pod)
+        opp_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+        return score - opp_score * min(self.raw_rewards_weight * 2.0, 1.0)
+
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
         action = np.clip(action, 0.0, 1.0)
         agent_solution = self._action_to_solution(action)
 
-        block_pod, run_pod = self.world.pods[:2]
-        opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
-                                            key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
-        opp_next_cp = opp_run_pod.next_checkpoint(self.world)
-        current_score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-        current_score -= block_pod.distance(opp_next_cp) / 5000.0
-        opp_current_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+        last_score = self._compute_score()
 
         opp_action = None
         if self.opp_solution_predict is not None:
@@ -90,20 +92,15 @@ class CsbEnv(gym.Env):
 
         if self.world.player_won(1):
             episode_over = True
-            easy_reward = 0.0
+            easy_reward = -10.0
             raw_reward = -10.0
         elif self.world.player_won(0):
             episode_over = True
-            easy_reward = 20.0
+            easy_reward = 10.0
             raw_reward = 10.0
         else:
             episode_over = False
-
-            now_score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-            now_score -= block_pod.distance(opp_next_cp) / 5000.0
-            opp_now_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-            easy_reward = now_score - current_score - 0.1 * (opp_now_score - opp_current_score)
-
+            easy_reward = self._compute_score() - last_score
             raw_reward = 0.0
 
         reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward

@@ -43,7 +43,11 @@ class Pod(Unit):
         cp_dist_score = (distance_cp_to_ncp - self.distance(next_cp)) / distance_cp_to_ncp
         return self.nbChecked() + cp_dist_score
 
-    def getAngle(self, p):
+    def block_score(self, opp_run_pod):
+        opp_next_cp = opp_run_pod.next_checkpoint()
+        return -(self.distance(opp_next_cp) + self.diffAngle(opp_run_pod)) / 5000.0
+
+    def _getAngle(self, p):
         d = self.distance(p)
         if d == 0:
             return 0
@@ -55,7 +59,7 @@ class Pod(Unit):
         return a
 
     def diffAngle(self, p):
-        a = self.getAngle(p)
+        a = self._getAngle(p)
         right = a - self.angle if self.angle <= a else 360.0 - self.angle + a
         left = self.angle - a if self.angle >= a else self.angle + 360.0 - a
         if right < left:
@@ -121,8 +125,8 @@ class Pod(Unit):
         unit.vx += fx / em
         unit.vy += fy / em
 
-    def next_checkpoint(self, world, number_next=0):
-        return world.circuit.cp((self.ncpid + number_next) % world.circuit.nbcp())
+    def next_checkpoint(self, number_next=0):
+        return self.world.circuit.cp((self.ncpid + number_next) % self.world.circuit.nbcp())
 
     def get_new_angle(self, gene):
         res = self.angle + LIN(CLAMP(gene, 0.1, 0.9), 0.1, -18.0, 0.9, 18.0)
