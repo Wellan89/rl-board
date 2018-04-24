@@ -47,7 +47,9 @@ class HardEnvCallback:
         self.printed = False
 
     def __call__(self, local_vars, global_vars):
-        if self.linear_schedule:
+        if self.switch_iterations == 0:
+            hard_env_weight = 1.0
+        elif self.linear_schedule:
             hard_env_weight = min(local_vars['iters_so_far'] / self.switch_iterations, 1.0)
         else:
             hard_env_weight = float(local_vars['iters_so_far'] >= self.switch_iterations)
