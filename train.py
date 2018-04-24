@@ -1,5 +1,4 @@
 import argparse
-import collections
 import datetime
 import os
 import random
@@ -63,48 +62,43 @@ class HardEnvCallback:
 
 
 class VersusCallback:
-    def __init__(self, env, start_iterations, threshold_iterations,
-                 opp_update_reward_threshold, default_ai_weight):
+    def __init__(self, env, start_iterations, threshold_iterations, default_ai_weight, latest_models_proportion):
         self.env = env.unwrapped
         self.env.enable_opponent(self.predict)
+
         self.start_iterations = start_iterations
         self.threshold_iterations = threshold_iterations
-        self.opp_update_reward_threshold = opp_update_reward_threshold
-        self.latest_rewards = collections.deque(maxlen=threshold_iterations)
+        self.default_ai_weight = default_ai_weight
+        self.latest_models_proportion = latest_models_proportion
+
+        self.n_steps_since_last_update = 0
         self.models = []
         self.current_model = None
 
-        if default_ai_weight > 0:
-            # This model is the default AI in the environment
-            self.models += [None] * default_ai_weight
-
     def __call__(self, local_vars, global_vars):
-        if not self.models:
-            # Load the first model
-            self.reload(local_vars)
+        if local_vars['iters_so_far'] < self.start_iterations:
             return
 
-        if 'rews' not in local_vars or local_vars['iters_so_far'] < self.start_iterations:
+        self.n_steps_since_last_update += 1
+        if self.n_steps_since_last_update < self.threshold_iterations:
             return
 
-        self.latest_rewards.append(sum(local_vars['rews']) / len(local_vars['rews']))
-        if len(self.latest_rewards) < self.threshold_iterations:
-            return
-
-        average_reward = sum(self.latest_rewards) / len(self.latest_rewards)
-        if self.opp_update_reward_threshold is None or average_reward >= self.opp_update_reward_threshold:
-            print('VersusCallback: Loading opponent {}: average reward is {:.2f} over the last {} iterations'.format(
-                len(self.models), average_reward, len(self.latest_rewards)
-            ))
-            self.reload(local_vars)
-            self.latest_rewards.clear()
+        print('VersusCallback: Loading opponent {}'.format(len(self.models)))
+        self.reload(local_vars)
+        self.n_steps_since_last_update = 0
 
     def reload(self, local_vars):
         self.models.append(csb.Model(_load_vars_dict(local_vars)))
 
     def predict(self, state, is_new_episode):
         if is_new_episode:
-            self.current_model = random.choice(self.models)
+            latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
+            if not latest_models:
+                latest_models = self.models[-1:]
+            latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
+            if not latest_models:
+                latest_models = [None]
+            self.current_model = random.choice(latest_models)
 
         if self.current_model:
             return self.current_model.predict(state)
@@ -204,9 +198,9 @@ def main():
 
     callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=200, linear_schedule=True),
-        VersusCallback(env=env, start_iterations=0, threshold_iterations=20,
-                       opp_update_reward_threshold=None, default_ai_weight=3),
+        HardEnvCallback(env=env, switch_iterations=100, linear_schedule=True),
+        VersusCallback(env=env, start_iterations=10, threshold_iterations=1,
+                       default_ai_weight=1, latest_models_proportion=0.5),
     ]
     if rank == 0:
         callbacks += [
@@ -217,8 +211,8 @@ def main():
         env, policy_fn, max_iters=10000,
         timesteps_per_actorbatch=timesteps_per_actorbatch,
         clip_param=0.2, entcoeff=0.0,
-        optim_epochs=10, optim_stepsize=1e-3, optim_batchsize=256,
-        gamma=0.99, lam=0.95, schedule='constant',
+        optim_epochs=6, optim_stepsize=1e-3, optim_batchsize=4096,
+        gamma=0.995, lam=0.95, schedule='constant',
         callback=lambda lv, gv: [cb(lv, gv) for cb in callbacks],
     )
     env.close()
