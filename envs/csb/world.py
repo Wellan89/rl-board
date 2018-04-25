@@ -35,18 +35,17 @@ class World:
         for pod in self.pods:
             pod.angle = angle - math.pi / 2.0
 
-    def play(self, s1, s2):
-
+    def play(self, s1, s2, low_shield_thrust_threshold=0):
         self.turn += 1
 
         for pod in self.pods:
             if pod.shield > 0:
                 pod.shield -= 1
 
-        self.pods[0].apply_move(s1.move1)
-        self.pods[1].apply_move(s1.move2)
-        self.pods[2].apply_move(s2.move1)
-        self.pods[3].apply_move(s2.move2)
+        self.pods[0].apply_move(s1.move1, low_shield_thrust_threshold=low_shield_thrust_threshold)
+        self.pods[1].apply_move(s1.move2, low_shield_thrust_threshold=low_shield_thrust_threshold)
+        self.pods[2].apply_move(s2.move1, low_shield_thrust_threshold=low_shield_thrust_threshold)
+        self.pods[3].apply_move(s2.move2, low_shield_thrust_threshold=low_shield_thrust_threshold)
 
         t = 0.0
         previousCollision = False

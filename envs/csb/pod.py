@@ -44,8 +44,7 @@ class Pod(Unit):
         return self.nbChecked() + cp_dist_score
 
     def block_score(self, opp_run_pod):
-        opp_next_cp = opp_run_pod.next_checkpoint()
-        return -(self.distance(opp_next_cp) + self.diffAngle(opp_run_pod)) / 5000.0
+        return -self.distance(opp_run_pod.next_checkpoint()) / 5000.0
 
     def _getAngle(self, p):
         d = self.distance(p)
@@ -80,8 +79,7 @@ class Pod(Unit):
             self.angle += 360.0
 
     def boost(self, thrust):
-        if self.shield > 0:
-            return
+        # assert self.shield == 0
         ra = self.angle * math.pi / 180.0
         self.vx += math.cos(ra) * thrust
         self.vy += math.sin(ra) * thrust
@@ -139,16 +137,17 @@ class Pod(Unit):
     def get_new_power(self, gene):
         return LIN(CLAMP(gene, 0.1, 0.9), 0.1, 0.0, 0.9, MAX_THRUST)
 
-    def apply_move(self, move):
+    def apply_move(self, move, low_shield_thrust_threshold=0):
+        can_thrust = (self.shield <= low_shield_thrust_threshold)
         self.angle = self.get_new_angle(move.g1)
         if move.g3 <= 0.1 and self.boost_available:
-            if self.shield == 0:
+            if can_thrust:
                 self.boost_available = False
-                self.boost(650)
+                self.boost(650.0)
         elif move.g3 >= 0.9:
             self.shield = 4
         else:
-            if self.shield == 0:
+            if can_thrust:
                 self.boost(self.get_new_power(move.g2))
 
     def to_dummy_move(self, speed):
