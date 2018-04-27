@@ -21,7 +21,6 @@ class CsbEnv(gym.Env):
         self.viewer = None
 
         self.use_cp_dist_score = True
-        self.easy_reward_difficulty = 0.0
         self.raw_rewards_weight = 0.0
         self.opp_solution_predict = None
 
@@ -58,9 +57,9 @@ class CsbEnv(gym.Env):
         block_pod, run_pod = self.world.pods[:2]
         opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
                                             key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
-        score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score) + block_pod.block_score(opp_run_pod)
+        score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
         opp_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-        return score - opp_score * self.easy_reward_difficulty
+        return score - opp_score * 0.1
 
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
@@ -85,9 +84,8 @@ class CsbEnv(gym.Env):
             opp_solution = self._action_to_solution(opp_action)
 
         safe_state = self._get_state()
-        low_shield_thrust_threshold = round(4.0 * (1.0 - self.easy_reward_difficulty))
         try:
-            self.world.play(agent_solution, opp_solution, low_shield_thrust_threshold=low_shield_thrust_threshold)
+            self.world.play(agent_solution, opp_solution, low_shield_thrust_threshold=0)
         except Exception as e:
             print('An error occurred during game generation!', e)
             return safe_state, 0.0, True, {}
@@ -118,8 +116,7 @@ class CsbEnv(gym.Env):
 
     def set_hard_env_weight(self, weight):
         assert 0.0 <= weight <= 1.0
-        self.easy_reward_difficulty = min(2.0 * weight, 1.0)
-        self.raw_rewards_weight = max(2.0 * (weight - 0.5), 0.0)
+        self.raw_rewards_weight = weight
 
     def enable_opponent(self, opp_solution_predict):
         self.opp_solution_predict = opp_solution_predict
@@ -130,12 +127,6 @@ class CsbEnvD0(CsbEnv):
 
 
 class CsbEnvD1(CsbEnv):
-    def __init__(self):
-        super().__init__()
-        self.set_hard_env_weight(weight=0.5)
-
-
-class CsbEnvD2(CsbEnv):
     def __init__(self):
         super().__init__()
         self.set_hard_env_weight(weight=1.0)
