@@ -1,15 +1,13 @@
 import argparse
 import datetime
 import functools
-import json
 import os
-import sys
 
+import gym
 import keras
 import numpy as np
 import scipy.stats
 from keras import backend as K
-from tensorforce.contrib.openai_gym import OpenAIGym
 from tqdm import tqdm
 
 import envs
@@ -162,8 +160,8 @@ def _read_data(supervised_data_dir, max_data_files, env):
                              _read_np_episodes, _read_np_episodes_shape)
     else:
         return _do_read_data(supervised_data_dir, max_data_files, '.game',
-                             functools.partial(_read_txt_episode, env=env),
-                             functools.partial(_read_txt_episodes_shape, env=env))
+                             functools.partial(_read_txt_episode, env=env.unwrapped),
+                             functools.partial(_read_txt_episodes_shape, env=env.unwrapped))
 
 
 def _softplus_layer(x):
@@ -192,22 +190,6 @@ class EntropyLayer(keras.layers.Layer):
         return tf.reduce_mean(entropy) * self.entropy_loss_bonus
 
 
-class AdjustEntropyLossCallback(keras.callbacks.Callback):
-    def __init__(self, entropy_loss_bonus, entropy_loss_weight, entropy_initial_weight):
-        super().__init__()
-        self.entropy_loss_bonus = entropy_loss_bonus
-        self.entropy_loss_weight = entropy_loss_weight
-        self.entropy_initial_weight = entropy_initial_weight
-
-    def on_epoch_begin(self, epoch, logs=None):
-        if self.entropy_loss_weight and self.entropy_initial_weight is not None \
-                and self.entropy_loss_weight < self.entropy_initial_weight and epoch == 0:
-            target_entropy_weight = self.entropy_initial_weight / self.entropy_loss_weight
-        else:
-            target_entropy_weight = 1.0
-        K.set_value(self.entropy_loss_bonus, target_entropy_weight)
-
-
 def _distribution_loss(y_true, y_pred):
     import tensorflow as tf
     alpha, beta = tf.split(y_pred, 2, axis=-1)
@@ -222,7 +204,6 @@ def main():
     parser.add_argument('gym_id', help="Id of the Gym environment")
     parser.add_argument('-n', '--network', help="Network specification file")
     parser.add_argument('--epochs', type=int, default=1000, help="Number of epochs")
-    parser.add_argument('--monitor', default=None, help="Save results to this directory")
     parser.add_argument('--data-dir', default=None, help="Directory containing the supervised training data")
     parser.add_argument('--max-data-files', type=int, default=None, help="Maximum number of data files to load")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
@@ -230,81 +211,49 @@ def main():
     parser.add_argument('--action-loss-weight', type=float, default=1.0, help="Action loss weight")
     parser.add_argument('--distribution-loss-weight', type=float, default=0.0, help="Distribution loss weight")
     parser.add_argument('--entropy-loss-weight', type=float, default=0.0, help="Entropy loss weight")
-    parser.add_argument('--entropy-initial-weight', type=float, default=None, help="Entropy loss weight for the first epoch")
     parser.add_argument('--outliers-removal-frequency', type=int, default=None, help="Outliers removal frequency (epochs)")
     parser.add_argument('--outliers-removal-proportion', type=float, default=None, help="Outliers removal proportion")
 
     args = parser.parse_args()
 
-    if not args.monitor:
-        args.monitor = 'supervised_{}_{}_{}'.format(args.gym_id, _basename_no_ext(args.network), datetime.datetime.now().isoformat())
     if not args.data_dir:
         args.data_dir = 'logs/supervised_data_{}'.format(args.gym_id)
 
-    with open(args.network, 'r') as fp:
-        network_def = json.load(fp=fp)
-
-    save_dir = 'logs/{}'.format(args.monitor)
+    save_dir = 'logs/supervised_{}_{}'.format(args.gym_id, datetime.datetime.now().isoformat())
     os.makedirs(save_dir, exist_ok=True)
     checkpoints_save_dir = os.path.join(save_dir, 'checkpoints')
     os.makedirs(checkpoints_save_dir, exist_ok=True)
 
-    environment = OpenAIGym(gym_id=args.gym_id)
+    env = gym.make(args.gym_id)
 
-    net_input = keras.layers.Input(shape=(environment.states['shape']))
-    network = net_input
-    for i, layer_def in enumerate(network_def):
-        assert layer_def['type'] == 'dense'
+    network = net_input = keras.layers.Input(shape=env.observation_space.shape)
+    for i in range(2):
+        network = keras.layers.Dense(units=80, activation='tanh', name='pol_fc{}'.format(i + 1))(network)
+    network = keras.layers.Dense(units=env.action_space.shape[0], name='pol_final')(network)
 
-        if layer_def.get('skip'):
-            assert layer_def.get('size') is None
-            units = int(network.shape[1])
-        else:
-            units = layer_def['size']
-
-        layer = keras.layers.Dense(units=units, activation=layer_def['activation'],
-                                   name='dense{}'.format(i))(network)
-
-        if layer_def.get('skip'):
-            layer = keras.layers.Dense(units=units, activation=None,
-                                       name='dense{}-skip'.format(i))(layer)
-            layer = keras.layers.add([network, layer])
-            layer = keras.layers.Activation(activation=layer_def['activation'])(layer)
-
-        network = layer
-
-    alpha = keras.layers.Dense(units=environment.actions['shape'][0], name='alpha')(network)
-    alpha = keras.layers.Lambda(_softplus_layer)(alpha)
-
-    beta = keras.layers.Dense(units=environment.actions['shape'][0], name='beta')(network)
-    beta = keras.layers.Lambda(_softplus_layer)(beta)
-
-    alpha_beta = keras.layers.add([alpha, beta])
-
-    x, y = _read_data(args.data_dir, args.max_data_files, environment.gym.unwrapped)
+    alpha = None
+    beta = None
+    alpha_beta = None
 
     outputs = []
     target_funcs = []
     loss_weights = {}
     loss = {}
     if args.action_loss_weight:
-        action = keras.layers.Lambda(lambda x: x[0] / x[1], name='action')([beta, alpha_beta])
-        outputs.append(action)
+        outputs.append(network)
         target_funcs.append(lambda y: y)
-        loss_weights['action'] = args.action_loss_weight
-        loss['action'] = 'mean_absolute_error'
+        loss_weights['pol_final'] = args.action_loss_weight
+        loss['pol_final'] = 'mean_absolute_error'
 
     if args.distribution_loss_weight:
-        distribution = keras.layers.concatenate([alpha, beta], name='distribution')
-        outputs.append(distribution)
+        outputs.append(keras.layers.concatenate([alpha, beta], name='distribution'))
         target_funcs.append(lambda y: y)
         loss_weights['distribution'] = args.distribution_loss_weight
         loss['distribution'] = _distribution_loss
 
     entropy_layer = EntropyLayer(name='entropy')
     if args.entropy_loss_weight:
-        entropy = entropy_layer([alpha, beta, alpha_beta])
-        outputs.append(entropy)
+        outputs.append(entropy_layer([alpha, beta, alpha_beta]))
         target_funcs.append(lambda y: np.zeros(shape=y.shape[0]))
         loss_weights['entropy'] = args.entropy_loss_weight
         loss['entropy'] = lambda y_true, y_pred: y_pred
@@ -317,8 +266,9 @@ def main():
         keras.callbacks.CSVLogger(os.path.join(save_dir, 'training_log.csv')),
         keras.callbacks.ModelCheckpoint(os.path.join(checkpoints_save_dir, 'keras_model_best.h5'), save_best_only=True),
         keras.callbacks.ModelCheckpoint(os.path.join(checkpoints_save_dir, 'keras_model_latest.h5'), save_best_only=False),
-        AdjustEntropyLossCallback(entropy_layer.entropy_loss_bonus, args.entropy_loss_weight, args.entropy_initial_weight),
     ]
+
+    x, y = _read_data(args.data_dir, args.max_data_files, env)
 
     validation_split = 0.1
     split_at = int(x.shape[0] * (1.0 - validation_split))
