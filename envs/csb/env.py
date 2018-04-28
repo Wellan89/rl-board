@@ -20,7 +20,6 @@ class CsbEnv(gym.Env):
         self.is_new_episode = True
         self.viewer = None
 
-        self.use_cp_dist_score = True
         self.raw_rewards_weight = 0.0
         self.opp_solution_predict = None
 
@@ -56,9 +55,9 @@ class CsbEnv(gym.Env):
     def _compute_score(self):
         block_pod, run_pod = self.world.pods[:2]
         opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
-                                            key=lambda pod: pod.score(use_cp_dist_score=self.use_cp_dist_score))
-        score = run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
-        opp_score = opp_run_pod.score(use_cp_dist_score=self.use_cp_dist_score)
+                                            key=lambda pod: pod.score(use_cp_dist_score=True))
+        score = 0.7 * run_pod.score(use_cp_dist_score=True) + 0.3 * block_pod.score(use_cp_dist_score=True)
+        opp_score = opp_run_pod.score(use_cp_dist_score=True)
         return score - opp_score * 0.1
 
     def step(self, action):
