@@ -47,7 +47,7 @@ class Model:
 
         layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
         layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
-        action = np.tanh(_matmul(layer, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0'])
+        action = _matmul(layer, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0']
 
         if not self.deterministic:
             action = np.random.normal(action, np.exp(self.weights['pi/pol/logstd:0'][0]))

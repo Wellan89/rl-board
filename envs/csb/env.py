@@ -56,7 +56,7 @@ class CsbEnv(gym.Env):
         block_pod, run_pod = self.world.pods[:2]
         opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
                                             key=lambda pod: pod.score(use_cp_dist_score=True))
-        score = 0.7 * run_pod.score(use_cp_dist_score=True) + 0.3 * block_pod.score(use_cp_dist_score=True)
+        score = 0.5 * run_pod.score(use_cp_dist_score=True) + 0.5 * block_pod.score(use_cp_dist_score=True)
         opp_score = opp_run_pod.score(use_cp_dist_score=True)
         return score - opp_score * 0.1
 
@@ -91,11 +91,11 @@ class CsbEnv(gym.Env):
 
         if self.world.player_won(1):
             episode_over = True
-            easy_reward = -10.0
+            easy_reward = 0.0
             raw_reward = -10.0
         elif self.world.player_won(0):
             episode_over = True
-            easy_reward = 10.0
+            easy_reward = 0.0
             raw_reward = 10.0
         else:
             episode_over = False
