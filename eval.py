@@ -30,8 +30,8 @@ def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
             if terminal:
                 break
         return reward
-    except Exception:
-        print('An exception occurred during game generation!')
+    except Exception as e:
+        print('An exception occurred during game generation!', e)
         return 0.0
 
 

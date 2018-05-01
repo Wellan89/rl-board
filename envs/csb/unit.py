@@ -1,6 +1,6 @@
-from envs.csb.point import Point
-from envs.csb.collision import Collision
 import math
+
+from envs.csb.point import Point
 
 
 class Unit(Point):
@@ -14,12 +14,13 @@ class Unit(Point):
         self.vx = vx
         self.vy = vy
 
-    # Retourne la prochaine collision avec 'unit'
+    # Retourne le temps t de la prochaine collision avec 'unit'
     def collision(self, unit):
         dist = self.distance2(unit)
-        somme_rayon_2 = (self.r + unit.r) * (self.r + unit.r)
+        somme_rayon_2 = (self.r + unit.r) ** 2
         if dist < somme_rayon_2:
-            return Collision(self, unit, 0.0)
+            # Ignore les collisions instantanées (ce sont les restes d'une ancienne collision résolue)
+            return None
 
         if self.vx == unit.vx and self.vy == unit.vy:
             return None
@@ -51,7 +52,7 @@ class Unit(Point):
         if pdist >= length:
             return None
 
-        return Collision(self, unit, pdist / length)
+        return pdist / length
 
     def bounce(self, unit):
         raise NotImplementedError('Abstract method')

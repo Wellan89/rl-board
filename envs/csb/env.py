@@ -82,18 +82,18 @@ class CsbEnv(gym.Env):
         else:
             opp_solution = self._action_to_solution(opp_action)
 
-        safe_state = self._get_state()
-        try:
-            self.world.play(agent_solution, opp_solution, low_shield_thrust_threshold=0)
-        except Exception as e:
-            print('An error occurred during game generation!', e)
-            return safe_state, 0.0, True, {}
+        self.world.play(agent_solution, opp_solution)
 
-        if self.world.player_won(1):
+        players_won = [self.world.player_won(i) for i in range(2)]
+        if players_won[0] and players_won[1]:
+            episode_over = True
+            easy_reward = 0.0
+            raw_reward = 0.0
+        elif players_won[1]:
             episode_over = True
             easy_reward = 0.0
             raw_reward = -10.0
-        elif self.world.player_won(0):
+        elif players_won[0]:
             episode_over = True
             easy_reward = 0.0
             raw_reward = 10.0

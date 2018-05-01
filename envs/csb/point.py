@@ -21,7 +21,7 @@ class Point:
         c1 = da * a.x + db * a.y
         c2 = -db * self.x + da * self.y
         det = da * da + db * db
-        if det != 0:
+        if det:
             cx = (da*c1 - db*c2) / det
             cy = (da*c2 + db*c1) / det
         else:

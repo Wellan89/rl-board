@@ -1,7 +1,6 @@
 import random
 import math
 
-from envs.csb.collision import Collision
 from envs.csb.circuit import Circuit
 from envs.csb.pod import Pod
 from envs.csb.vincent_algo import Pos
@@ -35,53 +34,54 @@ class World:
         for pod in self.pods:
             pod.angle = angle - math.pi / 2.0
 
-    def play(self, s1, s2, low_shield_thrust_threshold=0):
+    def play(self, s1, s2):
         self.turn += 1
 
         for pod in self.pods:
             if pod.shield > 0:
                 pod.shield -= 1
 
-        self.pods[0].apply_move(s1.move1, low_shield_thrust_threshold=low_shield_thrust_threshold)
-        self.pods[1].apply_move(s1.move2, low_shield_thrust_threshold=low_shield_thrust_threshold)
-        self.pods[2].apply_move(s2.move1, low_shield_thrust_threshold=low_shield_thrust_threshold)
-        self.pods[3].apply_move(s2.move2, low_shield_thrust_threshold=low_shield_thrust_threshold)
+        self.pods[0].apply_move(s1.move1)
+        self.pods[1].apply_move(s1.move2)
+        self.pods[2].apply_move(s2.move1)
+        self.pods[3].apply_move(s2.move2)
 
         t = 0.0
-        previousCollision = False
-        lasta = None
-        lastb = None
+        while True:
+            min_col_t = 1.0
+            collisions_min_t = []
+            for i, pod_i in enumerate(self.pods):
+                for j, col_b in enumerate(self.pods):
+                    if j > i:
+                        col_t = pod_i.collision(col_b)
+                        if col_t is not None and col_t + t <= 1.0:
+                            if col_t < min_col_t:
+                                min_col_t = col_t
+                                collisions_min_t = [(pod_i, col_b)]
+                            elif col_t == min_col_t:
+                                collisions_min_t.append((pod_i, col_b))
 
-        while t < 1.0:
-            firstCol = Collision(None, None, -1.0)
-            foundCol = False
-            for i in range(len(self.pods)):
-                for j in range(i+1, len(self.pods)):
-                    col = self.pods[i].collision(self.pods[j])
-                    if col is not None and col.t + t < 1.0 and (foundCol is False or col.t < firstCol.t):
-                        firstCol = col
-                        foundCol = True
+                col_b = self.circuit.cps[pod_i.ncpid]
+                col_t = pod_i.collision(col_b)
+                if col_t is not None and col_t + t <= 1.0:
+                    if col_t < min_col_t:
+                        min_col_t = col_t
+                        collisions_min_t = [(pod_i, col_b)]
+                    elif col_t == min_col_t:
+                        collisions_min_t.append((pod_i, col_b))
 
-                col = self.pods[i].collision(self.circuit.cps[self.pods[i].ncpid])
-                if col is not None and col.t + t < 1.0 and (foundCol is False or col.t < firstCol.t):
-                    firstCol = col
-                    foundCol = True
-
-            if foundCol is False or (
-                previousCollision and firstCol.t == 0.0 and firstCol.a == lasta and firstCol.b == lastb
-            ):
+            if collisions_min_t:
                 for pod in self.pods:
-                    pod.move(1.0-t)
-                t = 1.0
+                    pod.move(min_col_t)
+                t += min_col_t
+                assert t < 1.0
+
+                for col_a, col_b in collisions_min_t:
+                    col_b.bounce(col_a)
             else:
-                previousCollision = True
-                lasta = firstCol.a
-                lastb = firstCol.b
                 for pod in self.pods:
-                    pod.move(firstCol.t)
-
-                firstCol.b.bounce(firstCol.a)
-                t += firstCol.t
+                    pod.move(1.0 - t)
+                break
 
         for pod in self.pods:
             pod.end()
@@ -96,10 +96,6 @@ class World:
         # Opponent timeout
         if self.pods[(1-player)*2].timeout < 0 and self.pods[(1-player)*2+1].timeout < 0:
             return True
-
-        if self.turn > 900:
-            print('Warning: Abnormally long game! The opponent wins')
-            return player == 1
 
         return False
 

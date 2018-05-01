@@ -46,24 +46,11 @@ class Pod(Unit):
     def block_score(self, opp_run_pod):
         return -self.distance(opp_run_pod.next_checkpoint()) / 5000.0
 
-    def _getAngle(self, p):
-        d = self.distance(p)
-        if d == 0:
-            return 0
-        dx = (p.x - self.x) / d
-        dy = (p.y - self.y) / d
-        a = math.acos(dx) * 180.0 / math.pi
-        if dy < 0:
-            a = 360.0-a
-        return a
-
     def diffAngle(self, p):
-        a = self._getAngle(p)
+        a = math.atan2(p.y - self.y, p.x - self.x) * 180.0 / math.pi
         right = a - self.angle if self.angle <= a else 360.0 - self.angle + a
         left = self.angle - a if self.angle >= a else self.angle + 360.0 - a
-        if right < left:
-            return right
-        return -left
+        return right if right < left else -left
 
     def rotate(self, p):
         a = self.diffAngle(p)
@@ -89,8 +76,8 @@ class Pod(Unit):
         self.y += self.vy*t
 
     def end(self):
-        self.x = round(self.x)
-        self.y = round(self.y)
+        self.x = int(self.x + 0.5)
+        self.y = int(self.y + 0.5)
         self.vx = int(self.vx * 0.85)
         self.vy = int(self.vy * 0.85)
         self.timeout -= 1
@@ -137,17 +124,16 @@ class Pod(Unit):
     def get_new_power(self, gene):
         return LIN(CLAMP(gene, 0.1, 0.9), 0.1, 0.0, 0.9, MAX_THRUST)
 
-    def apply_move(self, move, low_shield_thrust_threshold=0):
-        can_thrust = (self.shield <= low_shield_thrust_threshold)
+    def apply_move(self, move):
         self.angle = self.get_new_angle(move.g1)
         if move.g3 <= 0.1 and self.boost_available:
-            if can_thrust:
+            if self.shield == 0:
                 self.boost_available = False
                 self.boost(650.0)
         elif move.g3 >= 0.9:
             self.shield = 4
         else:
-            if can_thrust:
+            if self.shield == 0:
                 self.boost(self.get_new_power(move.g2))
 
     def to_dummy_move(self, speed):
