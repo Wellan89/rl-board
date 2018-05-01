@@ -88,7 +88,7 @@ class Pod:
         self.vx = None
         self.vy = None
         self.angle = None
-        self.next_check_point_id = None
+        self.next_check_point_id = 1
         self.boost_available = True
         self.shield = 0
         self.lap = 0
@@ -173,24 +173,25 @@ class GameState:
             self.first_turn = False
 
     def extract_state(self):
-        features = [len(self.checkpoints) * self.laps]
+        features = [self.laps, len(self.checkpoints)]
         for pod in self.pods:
             features += [
-                pod.x / 1000.0,
-                pod.y / 1000.0,
-                pod.vx / 1000.0,
-                pod.vy / 1000.0,
+                pod.x / 5000.0,
+                pod.y / 5000.0,
+                pod.vx / 5000.0,
+                pod.vy / 5000.0,
                 pod.angle / 360.0,
                 float(pod.boost_available),
                 pod.timeout / 100.0,
                 pod.shield / 4.0,
-                float(pod.nb_checked(self)),
+                float(pod.lap),
+                float(pod.next_check_point_id),
             ]
             for i in range(3):
                 cp = pod.next_checkpoint(self, i)
                 features += [
-                    cp.x / 1000.0,
-                    cp.y / 1000.0,
+                    cp.x / 5000.0,
+                    cp.y / 5000.0,
                 ]
         return features
 

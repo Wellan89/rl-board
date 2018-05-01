@@ -53,12 +53,7 @@ class CsbEnv(gym.Env):
         )
 
     def _compute_score(self):
-        block_pod, run_pod = self.world.pods[:2]
-        opp_block_pod, opp_run_pod = sorted(self.world.pods[2:],
-                                            key=lambda pod: pod.score(use_cp_dist_score=True))
-        score = 0.5 * run_pod.score(use_cp_dist_score=True) + 0.5 * block_pod.score(use_cp_dist_score=True)
-        opp_score = opp_run_pod.score(use_cp_dist_score=True)
-        return score - opp_score * 0.1
+        return 0.5 * sum(pod.score(use_cp_dist_score=True) for pod in self.world.pods[:2])
 
     def step(self, action):
         # assert (len(action),) == self.action_space.shape

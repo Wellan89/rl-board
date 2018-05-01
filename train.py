@@ -178,7 +178,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('gym_id')
     parser.add_argument('-l', '--load')
-    parser.add_argument('-e', '--episodes-per-batch', type=int, default=2000)
+    parser.add_argument('-e', '--episodes-per-batch', type=int, default=2500)
     args = parser.parse_args()
 
     rank = MPI.COMM_WORLD.Get_rank()
@@ -191,7 +191,7 @@ def main():
     env = bench.Monitor(gym.make(args.gym_id), os.path.join(logger.get_dir(), str(rank)))
 
     episodes_per_actorbatch = args.episodes_per_batch // size
-    timesteps_per_actorbatch = episodes_per_actorbatch * 250
+    timesteps_per_actorbatch = episodes_per_actorbatch * 200
 
     callbacks = []
     if rank == 0:
@@ -202,7 +202,7 @@ def main():
 
     callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=200, linear_schedule=True),
+        HardEnvCallback(env=env, switch_iterations=400, linear_schedule=True),
         VersusCallback(env=env, start_iterations=20, threshold_iterations=20,
                        default_ai_weight=3, latest_models_proportion=0.0),
     ]
