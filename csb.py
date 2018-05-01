@@ -9,6 +9,10 @@ import numpy as np
 MODEL_DATA = {}
 
 
+IS_CODINGAME = False
+pod_msgs = ['', '']
+
+
 def _matmul(a, b):
     return np.einsum('i,ij->j', a, b)
 
@@ -29,17 +33,26 @@ class Model:
         return cls(weights=weights)
 
     def predict(self, state):
-        layer = np.array(state, dtype=np.float64)
+        obz = np.array(state, dtype=np.float64)
         state_mean = self.weights['pi/obfilter/runningsum:0'] / self.weights['pi/obfilter/count:0']
         state_std = np.sqrt(np.maximum(
             (self.weights['pi/obfilter/runningsumsq:0'] / self.weights['pi/obfilter/count:0']) - np.square(state_mean),
             1e-2
         ))
-        layer = np.clip((layer - state_mean) / state_std, -5.0, 5.0)
+        obz = np.clip((obz - state_mean) / state_std, -5.0, 5.0)
 
-        layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
-        layer = np.tanh(_matmul(layer, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
-        action = _matmul(layer, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0']
+        action = np.tanh(_matmul(obz, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
+        action = np.tanh(_matmul(action, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
+        action = _matmul(action, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0']
+
+        if IS_CODINGAME:
+            vf = np.tanh(_matmul(obz, self.weights['pi/vf/fc1/kernel:0']) + self.weights['pi/vf/fc1/bias:0'])
+            vf = np.tanh(_matmul(vf, self.weights['pi/vf/fc2/kernel:0']) + self.weights['pi/vf/fc2/bias:0'])
+            vf = float(_matmul(vf, self.weights['pi/vf/final/kernel:0']) + self.weights['pi/vf/final/bias:0'])
+            print(action, file=sys.stderr)
+            print(np.exp(self.weights['pi/pol/logstd:0'][0]), file=sys.stderr)
+            print('{:.2f}'.format(vf), file=sys.stderr)
+            pod_msgs[:] = [' {:.2f}'.format(vf)] * 2
 
         if not self.deterministic:
             action = np.random.normal(action, np.exp(self.weights['pi/pol/logstd:0'][0]))
@@ -68,7 +81,8 @@ class Point:
 
 
 class Pod:
-    def __init__(self):
+    def __init__(self, pod_id):
+        self.id = pod_id
         self.x = None
         self.y = None
         self.vx = None
@@ -123,12 +137,12 @@ class Pod:
         power = move[1] * 200.0
         if move[2] <= 0.2 and self.boost_available:
             self.boost_available = False
-            print('{:.0f} {:.0f} BOOST'.format(px, py))
+            print('{:.0f} {:.0f} BOOST{}'.format(px, py, pod_msgs[self.id]))
         elif move[2] >= 0.8:
             self.shield = 4
-            print('{:.0f} {:.0f} SHIELD'.format(px, py))
+            print('{:.0f} {:.0f} SHIELD{}'.format(px, py, pod_msgs[self.id]))
         else:
-            print('{:.0f} {:.0f} {:.0f}'.format(px, py, power))
+            print('{:.0f} {:.0f} {:.0f}{}'.format(px, py, power, pod_msgs[self.id]))
         self.timeout -= 1
 
 
@@ -136,7 +150,7 @@ class GameState:
     def __init__(self, laps, checkpoints):
         self.laps = laps
         self.checkpoints = checkpoints
-        self.pods = [Pod() for _ in range(4)]
+        self.pods = [Pod(i) for i in range(4)]
         self.first_turn = True
 
     @classmethod
@@ -196,4 +210,5 @@ def main():
 
 
 if __name__ == "__main__":
+    IS_CODINGAME = True
     main()
