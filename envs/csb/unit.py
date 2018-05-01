@@ -19,8 +19,7 @@ class Unit(Point):
         dist = self.distance2(unit)
         somme_rayon_2 = (self.r + unit.r) ** 2
         if dist < somme_rayon_2:
-            # Ignore les collisions instantanées (ce sont les restes d'une ancienne collision résolue)
-            return None
+            return 0.0
 
         if self.vx == unit.vx and self.vy == unit.vy:
             return None

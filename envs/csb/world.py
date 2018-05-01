@@ -47,37 +47,35 @@ class World:
         self.pods[3].apply_move(s2.move2)
 
         t = 0.0
+        lasta = set()
+        lastb = set()
         while True:
-            min_col_t = 1.0
-            collisions_min_t = []
+            firstCol = None
             for i, pod_i in enumerate(self.pods):
                 for j, col_b in enumerate(self.pods):
-                    if j > i:
+                    if j > i and (id(pod_i) not in lasta or id(col_b) not in lastb):
                         col_t = pod_i.collision(col_b)
-                        if col_t is not None and col_t + t <= 1.0:
-                            if col_t < min_col_t:
-                                min_col_t = col_t
-                                collisions_min_t = [(pod_i, col_b)]
-                            elif col_t == min_col_t:
-                                collisions_min_t.append((pod_i, col_b))
+                        if col_t is not None and col_t + t < 1.0 and (not firstCol or col_t < firstCol[2]):
+                            firstCol = (pod_i, col_b, col_t)
 
                 col_b = self.circuit.cps[pod_i.ncpid]
                 col_t = pod_i.collision(col_b)
-                if col_t is not None and col_t + t <= 1.0:
-                    if col_t < min_col_t:
-                        min_col_t = col_t
-                        collisions_min_t = [(pod_i, col_b)]
-                    elif col_t == min_col_t:
-                        collisions_min_t.append((pod_i, col_b))
+                if col_t is not None and col_t + t < 1.0 and (not firstCol or col_t < firstCol[2]):
+                    firstCol = (pod_i, col_b, col_t)
 
-            if collisions_min_t:
+            if firstCol:
+                col_a, col_b, col_t = firstCol
+                if col_t > 0.0:
+                    lasta.clear()
+                    lastb.clear()
+                lasta.add(id(col_a))
+                lastb.add(id(col_b))
+
                 for pod in self.pods:
-                    pod.move(min_col_t)
-                t += min_col_t
-                assert t < 1.0
+                    pod.move(col_t)
+                t += col_t
 
-                for col_a, col_b in collisions_min_t:
-                    col_b.bounce(col_a)
+                col_b.bounce(col_a)
             else:
                 for pod in self.pods:
                     pod.move(1.0 - t)
