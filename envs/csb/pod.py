@@ -3,7 +3,7 @@ import math
 from envs.csb.move import Move
 from envs.csb.unit import Unit
 from envs.csb.point import Point
-from envs.csb.util import LIN, CLAMP, MAX_THRUST, TIMEOUT
+from envs.csb.util import MAX_THRUST, TIMEOUT
 
 
 class Pod(Unit):
@@ -114,7 +114,7 @@ class Pod(Unit):
         return self.world.circuit.cp((self.ncpid + number_next) % self.world.circuit.nbcp())
 
     def get_new_angle(self, gene):
-        res = self.angle + LIN(CLAMP(gene, 0.1, 0.9), 0.1, -18.0, 0.9, 18.0)
+        res = self.angle + gene * 36.0 - 18.0
         if res >= 360.0:
             res -= 360.0
         elif res < 0.0:
@@ -122,30 +122,29 @@ class Pod(Unit):
         return res
 
     def get_new_power(self, gene):
-        return LIN(CLAMP(gene, 0.1, 0.9), 0.1, 0.0, 0.9, MAX_THRUST)
+        return gene * MAX_THRUST
 
     def apply_move(self, move):
         self.angle = self.get_new_angle(move.g1)
-        if move.g3 <= 0.1 and self.boost_available:
+        if move.g3 <= 0.2 and self.boost_available:
             if self.shield == 0:
                 self.boost_available = False
                 self.boost(650.0)
-        elif move.g3 >= 0.9:
+        elif move.g3 >= 0.8:
             self.shield = 4
-        else:
-            if self.shield == 0:
-                self.boost(self.get_new_power(move.g2))
+        elif self.shield == 0:
+            self.boost(self.get_new_power(move.g2))
 
     def to_dummy_move(self, speed):
         return Move(
-            g1=CLAMP(LIN(self.diffAngle(self.world.circuit.cp(self.ncpid)), -18.0, 0.1, 18.0, 0.9), 0.1, 0.9),
-            g2=CLAMP(LIN(speed, 0.0, 0.1, MAX_THRUST, 0.9), 0.1, 0.9),
+            g1=(self.diffAngle(self.world.circuit.cp(self.ncpid)) + 18.0) / 36.0,
+            g2=speed / MAX_THRUST,
             g3=0.5
         )
 
     def genes_from_vincent_command(self, command):
         return Move(
-            g1=CLAMP(LIN(self.diffAngle(Point(command.target.x, command.target.y)), -18.0, 0.1, 18.0, 0.9), 0.1, 0.9),
-            g2=CLAMP(LIN(command.thrust, 0.0, 0.1, MAX_THRUST, 0.9), 0.1, 0.9),
+            g1=(self.diffAngle(Point(command.target.x, command.target.y)) + 18.0) / 36.0,
+            g2=command.thrust / MAX_THRUST,
             g3=1.0 if command.shield else 0.5,
         )

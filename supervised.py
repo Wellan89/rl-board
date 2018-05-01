@@ -62,9 +62,9 @@ def _read_txt_episode(data_file, env):
             # (linear scales and thresholds are modified)
             for action in actions:
                 for g in [0, 3]:
-                    action[g] = LIN(CLAMP(action[g], 0.25, 0.75), 0.25, 0.1, 0.75, 0.9)
+                    action[g] = LIN(CLAMP(action[g], 0.25, 0.75), 0.25, 0.0, 0.75, 1.0)
                 for g in [1, 4]:
-                    action[g] = LIN(CLAMP(action[g], 0.2, 0.8), 0.2, 0.1, 0.8, 0.9)
+                    action[g] = LIN(CLAMP(action[g], 0.2, 0.8), 0.2, 0.0, 0.8, 1.0)
                 for g in [2, 5]:
                     if action[g] < 0.05:
                         action[g] = 0.1
