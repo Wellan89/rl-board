@@ -76,6 +76,10 @@ class VersusCallback:
         self.current_model = None
 
     def __call__(self, local_vars, global_vars):
+        if not self.models and not self.default_ai_weight:
+            self.reload(local_vars)
+            return
+
         if local_vars['iters_so_far'] < self.start_iterations:
             return
 
@@ -167,7 +171,7 @@ class VideoMonitorCallback:
 
 
 def policy_fn(name, ob_space, ac_space):
-    return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=80, num_hid_layers=2)
+    return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=96, num_hid_layers=2)
 
 
 def main():

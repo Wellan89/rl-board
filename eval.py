@@ -2,6 +2,7 @@ import argparse
 import datetime
 import math
 import multiprocessing
+import os
 
 from scipy import stats
 from tensorforce.contrib.openai_gym import OpenAIGym
@@ -73,17 +74,18 @@ def main():
     eval_idx = 0
     while True:
         eval_idx += 1
-        print('{} - Evaluation {} ({} run):'.format(datetime.datetime.now(), eval_idx,
-                                                    'deterministic' if args.deterministic else 'random'))
-        rewards = _compute_rewards(gym_id=args.gym_id, model_path=args.load, episodes=args.episodes,
-                                   monitor=monitor, processes=args.processes, deterministic=bool(args.deterministic),
-                                   versus_model_path=args.versus, versus_deterministic=bool(args.versus_deterministic))
+        for model_path in args.load.split(','):
+            print('{} - {} - Evaluation {} ({} run):'.format(model_path, datetime.datetime.now(), eval_idx,
+                                                             'deterministic' if args.deterministic else 'random'))
+            rewards = _compute_rewards(gym_id=args.gym_id, model_path=model_path, episodes=args.episodes,
+                                       monitor=monitor, processes=args.processes, deterministic=bool(args.deterministic),
+                                       versus_model_path=args.versus, versus_deterministic=bool(args.versus_deterministic))
 
-        print('Rewards statistics:')
-        desc = stats.describe(rewards)
-        print(desc)
-        print('95% confidence interval:', stats.norm.interval(0.95, loc=desc.mean, scale=math.sqrt(desc.variance / desc.nobs)))
-        print('\n')
+            print('Rewards statistics:')
+            desc = stats.describe(rewards)
+            print(desc)
+            print('95% confidence interval:', stats.norm.interval(0.95, loc=desc.mean, scale=math.sqrt(desc.variance / desc.nobs)))
+            print('\n')
 
         if not args.monitor:
             break
