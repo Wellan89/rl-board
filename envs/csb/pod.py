@@ -83,8 +83,8 @@ class Pod(Unit):
         self.timeout -= 1
 
     def bounce(self, unit):
-        tm = 10 if self.shield == 4 else 1
-        em = 10 if unit.shield == 4 else 1
+        tm = 10.0 if self.shield == 4 else 1.0
+        em = 10.0 if unit.shield == 4 else 1.0
         mcoeff = (tm + em) / (tm * em)
         nx = self.x - unit.x
         ny = self.y - unit.y
@@ -92,7 +92,7 @@ class Pod(Unit):
         dvx = self.vx - unit.vx
         dvy = self.vy - unit.vy
         product = nx*dvx + ny*dvy
-        fx = (nx * product) / (nxnysquare * mcoeff)
+        fx = (nx * product) / (nxnysquare * mcoeff)  # Can raise ZeroDivisionError: float division by zero
         fy = (ny * product) / (nxnysquare * mcoeff)
 
         self.vx -= fx / tm
