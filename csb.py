@@ -99,7 +99,7 @@ class Pod:
 
         if self.next_check_point_id != next_check_point_id:
             self.timeout = 100
-            if next_check_point_id == 0:
+            if next_check_point_id == 1:
                 self.lap += 1
 
         self.x = x
@@ -173,7 +173,7 @@ class GameState:
             self.first_turn = False
 
     def extract_state(self):
-        features = [self.laps, len(self.checkpoints)]
+        features = [float(self.laps), float(len(self.checkpoints))]
         for pod in self.pods:
             features += [
                 pod.x / 5000.0,

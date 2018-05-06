@@ -1,5 +1,5 @@
 def observation(world, pods):
-    features = [world.nblaps, world.circuit.nbcp()]
+    features = [float(world.nblaps), float(world.circuit.nbcp())]
     for pod in pods:
         features += [
             pod.x / 5000.0,
