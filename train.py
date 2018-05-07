@@ -96,10 +96,11 @@ class VersusCallback:
 
     def predict(self, state, is_new_episode):
         if is_new_episode:
-            latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
+            latest_models = self.models[-10:]
             if not latest_models:
                 latest_models = self.models[-1:]
-            latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
+            if len(self.models) < 100:
+                latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
             if not latest_models:
                 latest_models = [None]
             self.current_model = random.choice(latest_models)
@@ -202,9 +203,9 @@ def main():
 
     callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=300, linear_schedule=True),
-        VersusCallback(env=env, start_iterations=20, threshold_iterations=20,
-                       default_ai_weight=3, latest_models_proportion=0.0),
+        HardEnvCallback(env=env, switch_iterations=0, linear_schedule=True),
+        VersusCallback(env=env, start_iterations=0, threshold_iterations=5,
+                       default_ai_weight=1, latest_models_proportion=0.0),
     ]
     if rank == 0:
         callbacks += [
