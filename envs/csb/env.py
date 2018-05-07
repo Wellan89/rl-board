@@ -92,11 +92,11 @@ class CsbEnv(gym.Env):
         elif players_won[1]:
             episode_over = True
             easy_reward = 0.0
-            raw_reward = -10.0
+            raw_reward = -10.0 + 3 * (self.world.turn / 500)
         elif players_won[0]:
             episode_over = True
             easy_reward = 0.0
-            raw_reward = 10.0
+            raw_reward = 10.0 - 3 * (self.world.turn / 500)
         else:
             episode_over = False
             easy_reward = self._compute_score() - last_score
