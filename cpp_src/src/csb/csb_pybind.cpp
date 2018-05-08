@@ -127,19 +127,8 @@ public:
     }
     float compute_agent_score() {
         float score = 0;
-        for (int i = 0; i < 2; i++) {
-            Checkpoint& current_cp = circuit.cp((w.pods[i].ncpid + circuit.nbcp() - 1) % circuit.nbcp());
-            Checkpoint& next_cp = circuit.cp(w.pods[i].ncpid);
-            float distance_cp_to_ncp = current_cp.distance(next_cp);
-            float cp_dist_score = (distance_cp_to_ncp - w.pods[i].distance(next_cp)) / distance_cp_to_ncp;
-
-            int lastCP = w.pods[i].ncpid - 1;
-            if (lastCP == -1)
-                lastCP = circuit.nbcp() - 1;
-            int nbChecked = w.pods[i].lap * circuit.nbcp() + lastCP;
-
-            score += 0.5 * (nbChecked + cp_dist_score);
-        }
+        for (int i = 0; i < 2; i++)
+            score += 0.5 * w.pods[i].env_score();
         return score;
     }
     vector<float> dummy_opp_solution() {
@@ -180,5 +169,6 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def_readwrite("angle", &Pod::angle)
         .def_readwrite("shield", &Pod::shield)
         .def_readwrite("boost_available", &Pod::boost_available)
+        .def("score", &Pod::env_score)
         .def("next_checkpoint", [](Pod& pod) { return circuit.cp(pod.ncpid); });
 }
