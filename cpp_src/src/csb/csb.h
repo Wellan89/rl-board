@@ -282,13 +282,7 @@ public:
         return nbChecked*50000-distance(circuit.cp(ncpid));
     }
     float getAngle(Point p) {
-        float d = this->distance(p);
-        float dx = (p.x - this->x) / d;
-        float dy = (p.y - this->y) / d;
-        float a = acos(dx)*180.0/PI;
-        if (dy < 0)
-            a = 360.0-a;
-        return a;
+        return atan2(p.y - y, p.x - x) * 180.0 / PI;
     }
     float diffAngle(Point p) {
         float a = this->getAngle(p);

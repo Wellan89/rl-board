@@ -15,7 +15,7 @@ from baselines.ppo1 import pposgd_simple, mlp_policy
 
 import envs
 import checkpoints_utils
-import csb
+import csb_agent
 
 
 def _load_vars_dict(local_vars):
@@ -92,7 +92,7 @@ class VersusCallback:
         self.n_steps_since_last_update = 0
 
     def reload(self, local_vars):
-        self.models.append(csb.Model(_load_vars_dict(local_vars)))
+        self.models.append(csb_agent.Model(_load_vars_dict(local_vars)))
 
     def predict(self, state, is_new_episode):
         if is_new_episode:
@@ -166,7 +166,7 @@ class VideoMonitorCallback:
             return
 
         monitor_path = os.path.join(self.log_dir, 'video_monitor/{}'.format(local_vars['iters_so_far']))
-        model = csb.Model(_load_vars_dict(local_vars))
+        model = csb_agent.Model(_load_vars_dict(local_vars))
         threading.Thread(target=self._do_monitor, args=(monitor_path, model)).start()
 
 

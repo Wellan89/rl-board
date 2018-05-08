@@ -99,7 +99,7 @@ class BuildExt(build_ext):
         if ct == 'unix':
             opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
             opts.append(cpp_flag(self.compiler))
-            opts += ['-Ofast', '-pthread', '-march=native', '-DNDEBUG']
+            opts += ['-Ofast', '-march=native', '-DNDEBUG']
             if has_flag(self.compiler, ['-fvisibility=hidden']):
                 opts.append('-fvisibility=hidden')
         elif ct == 'msvc':

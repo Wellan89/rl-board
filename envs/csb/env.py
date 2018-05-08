@@ -2,7 +2,11 @@ import os
 import gym
 import numpy as np
 
-from envs.csb.world import World
+from csb import csb
+
+from envs.csb import renderer
+from envs.csb.util import CLAMP
+# from envs.csb.world import World
 
 DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
 
@@ -13,8 +17,9 @@ class CsbEnv(gym.Env):
     spec = None
 
     def __init__(self):
-        self.world = World()
+        self.world = None
         self.is_new_episode = True
+        self.reset()
         self.viewer = None
 
         self.raw_rewards_weight = 0.0
@@ -25,17 +30,17 @@ class CsbEnv(gym.Env):
                                                 shape=(len(self._get_state()),))
 
     def reset(self):
-        self.world = World()
+        self.world = csb.World()
         self.is_new_episode = True
         return self._get_state()
 
     def _get_state(self, opponent_view=False):
-        return self.world.compute_state(opponent_view=opponent_view)
+        return np.array(self.world.compute_state(opponent_view))
 
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
-        action = np.clip(action, 0.0, 1.0)
+        action = [CLAMP(v, 0.0, 1.0) for v in action]
 
         last_score = self.world.compute_agent_score()
 
@@ -81,7 +86,7 @@ class CsbEnv(gym.Env):
         if DISABLE_RENDERING:
             return None
 
-        self.viewer, rendered = self.world.render(viewer=self.viewer, mode=mode)
+        self.viewer, rendered = renderer.render(world=self.world, viewer=self.viewer, mode=mode)
         return rendered
 
     def set_hard_env_weight(self, weight):

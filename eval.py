@@ -8,7 +8,7 @@ from scipy import stats
 from tensorforce.contrib.openai_gym import OpenAIGym
 
 import checkpoints_utils
-import csb
+import csb_agent
 import envs
 
 
@@ -46,9 +46,9 @@ class _MappedGenerateEpisodeData:
 def _compute_rewards(gym_id, model_path, episodes, monitor, processes,
                      deterministic, versus_model_path, versus_deterministic):
     with multiprocessing.Pool(processes=processes) as p:
-        model = csb.Model(checkpoints_utils.read_weights(model_path), deterministic=deterministic)
+        model = csb_agent.Model(checkpoints_utils.read_weights(model_path), deterministic=deterministic)
         if versus_model_path:
-            versus_model = csb.Model(checkpoints_utils.read_weights(versus_model_path), deterministic=versus_deterministic)
+            versus_model = csb_agent.Model(checkpoints_utils.read_weights(versus_model_path), deterministic=versus_deterministic)
         else:
             versus_model = None
         return p.map(_MappedGenerateEpisodeData(gym_id=gym_id, model=model, versus_model=versus_model, monitor=monitor),
