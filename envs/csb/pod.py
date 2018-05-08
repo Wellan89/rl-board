@@ -1,6 +1,5 @@
 import math
 
-from envs.csb.move import Move
 from envs.csb.unit import Unit
 from envs.csb.point import Point
 from envs.csb.util import MAX_THRUST, TIMEOUT
@@ -125,26 +124,26 @@ class Pod(Unit):
         return gene * MAX_THRUST
 
     def apply_move(self, move):
-        self.angle = self.get_new_angle(move.g1)
-        if move.g3 <= 0.2 and self.boost_available:
+        self.angle = self.get_new_angle(move[0])
+        if move[2] <= 0.2 and self.boost_available:
             if self.shield == 0:
                 self.boost_available = False
                 self.boost(650.0)
-        elif move.g3 >= 0.8:
+        elif move[2] >= 0.8:
             self.shield = 4
         elif self.shield == 0:
-            self.boost(self.get_new_power(move.g2))
+            self.boost(self.get_new_power(move[1]))
 
     def to_dummy_move(self, speed):
-        return Move(
-            g1=(self.diffAngle(self.world.circuit.cp(self.ncpid)) + 18.0) / 36.0,
-            g2=speed / MAX_THRUST,
-            g3=0.5
-        )
+        return [
+            (self.diffAngle(self.world.circuit.cp(self.ncpid)) + 18.0) / 36.0,
+            speed / MAX_THRUST,
+            0.5,
+        ]
 
     def genes_from_vincent_command(self, command):
-        return Move(
-            g1=(self.diffAngle(Point(command.target.x, command.target.y)) + 18.0) / 36.0,
-            g2=command.thrust / MAX_THRUST,
-            g3=1.0 if command.shield else 0.5,
-        )
+        return [
+            (self.diffAngle(Point(command.target.x, command.target.y)) + 18.0) / 36.0,
+            command.thrust / MAX_THRUST,
+            1.0 if command.shield else 0.5,
+        ]

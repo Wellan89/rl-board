@@ -74,9 +74,9 @@ def _read_txt_episode(data_file, env):
                         action[g] = 0.5
                 assert all(0.0 <= v <= 1.0 for v in action)
 
-            x.append(env.compute_custom_state(world, opponent_view=False))
+            x.append(world.compute_state(opponent_view=False))
             y.append(actions[0])
-            x.append(env.compute_custom_state(world, opponent_view=True))
+            x.append(world.compute_state(opponent_view=True))
             y.append(actions[1])
 
     x = np.array(x, dtype=np.float32)

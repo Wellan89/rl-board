@@ -26,8 +26,7 @@ def _generate_episode_data(episode_id, gym_id, monitor):
         episode = []
         while True:
             interface.feed(world)
-            actions = interface.get_moves(world, 0)
-            action = [actions[0].g1, actions[0].g2, actions[0].g3, actions[1].g1, actions[1].g2, actions[1].g3]
+            action = interface.get_moves(world, 0)
             episode.append((state, action))
             state, terminal, step_reward = environment.execute(action)
             if terminal:

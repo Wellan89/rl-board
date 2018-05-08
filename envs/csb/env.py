@@ -2,10 +2,7 @@ import os
 import gym
 import numpy as np
 
-from envs.csb import observation
 from envs.csb.world import World
-from envs.csb.solution import Solution
-from envs.csb.move import Move
 
 DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
 
@@ -32,54 +29,28 @@ class CsbEnv(gym.Env):
         self.is_new_episode = True
         return self._get_state()
 
-    def compute_custom_state(self, world, opponent_view=False):
-        if opponent_view:
-            pods = world.pods[2:] + world.pods[:2]
-        else:
-            pods = world.pods
-
-        state = observation.observation(world, pods)
-        # assert(all(self.observation_space.low <= v <= self.observation_space.high for v in state))
-        return np.array(state)
-
     def _get_state(self, opponent_view=False):
-        return self.compute_custom_state(self.world, opponent_view=opponent_view)
-
-    def _action_to_solution(self, action):
-        assert len(action) == 6
-        return Solution(
-            move1=Move(g1=action[0], g2=action[1], g3=action[2]),
-            move2=Move(g1=action[3], g2=action[4], g3=action[5]),
-        )
-
-    def _compute_score(self):
-        return 0.5 * sum(pod.score(use_cp_dist_score=True) for pod in self.world.pods[:2])
+        return self.world.compute_state(opponent_view=opponent_view)
 
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
         action = np.clip(action, 0.0, 1.0)
-        agent_solution = self._action_to_solution(action)
 
-        last_score = self._compute_score()
+        last_score = self.world.compute_agent_score()
 
-        opp_action = None
+        opp_solution = None
         if self.opp_solution_predict is not None:
-            opp_action = self.opp_solution_predict(self._get_state(opponent_view=True), self.is_new_episode)
+            opp_solution = self.opp_solution_predict(self._get_state(opponent_view=True), self.is_new_episode)
         self.is_new_episode = False
 
         # Dummy solution : straight line toward the next checkpoint
-        if opp_action is None:
-            opp_solution = Solution(
-                move1=self.world.pods[2].to_dummy_move(speed=80.0),
-                move2=self.world.pods[3].to_dummy_move(speed=80.0),
-            )
-        else:
-            opp_solution = self._action_to_solution(opp_action)
+        if opp_solution is None:
+            opp_solution = self.world.dummy_opp_solution()
 
         safe_state = self._get_state()
         try:
-            self.world.play(agent_solution, opp_solution)
+            self.world.play(action, opp_solution)
         except Exception as e:
             print('An error occurred during game generation!', e)
             return safe_state, 0.0, True, {}
@@ -99,7 +70,7 @@ class CsbEnv(gym.Env):
             raw_reward = 10.0
         else:
             episode_over = False
-            easy_reward = self._compute_score() - last_score
+            easy_reward = self.world.compute_agent_score() - last_score
             raw_reward = 0.0
 
         reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward

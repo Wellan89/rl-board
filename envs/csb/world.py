@@ -1,6 +1,8 @@
 import random
 import math
 
+import numpy as np
+
 from envs.csb.circuit import Circuit
 from envs.csb.pod import Pod
 from envs.csb.vincent_algo import Pos
@@ -41,10 +43,10 @@ class World:
             if pod.shield > 0:
                 pod.shield -= 1
 
-        self.pods[0].apply_move(s1.move1)
-        self.pods[1].apply_move(s1.move2)
-        self.pods[2].apply_move(s2.move1)
-        self.pods[3].apply_move(s2.move2)
+        self.pods[0].apply_move(s1[:3])
+        self.pods[1].apply_move(s1[3:])
+        self.pods[2].apply_move(s2[:3])
+        self.pods[3].apply_move(s2[3:])
 
         t = 0.0
         lasta = set()
@@ -160,3 +162,37 @@ class World:
             )
 
         return viewer, viewer.render(return_rgb_array=(mode == 'rgb_array'))
+
+    def dummy_opp_solution(self):
+        return self.pods[2].to_dummy_move(speed=80.0) + self.pods[3].to_dummy_move(speed=80.0)
+
+    def compute_agent_score(self):
+        return 0.5 * sum(pod.score(use_cp_dist_score=True) for pod in self.pods[:2])
+
+    def compute_state(self, opponent_view=False):
+        if opponent_view:
+            pods = self.pods[2:] + self.pods[:2]
+        else:
+            pods = self.pods
+
+        features = [float(self.nblaps), float(self.circuit.nbcp())]
+        for pod in pods:
+            features += [
+                pod.x / 5000.0,
+                pod.y / 5000.0,
+                pod.vx / 5000.0,
+                pod.vy / 5000.0,
+                pod.angle / 360.0,
+                float(pod.boost_available),
+                pod.timeout / 100.0,
+                pod.shield / 4.0,
+                float(pod.lap),
+                float(pod.ncpid),
+            ]
+            for i in range(3):
+                cp = pod.next_checkpoint(i)
+                features += [
+                    cp.x / 5000.0,
+                    cp.y / 5000.0,
+                ]
+        return np.array(features)

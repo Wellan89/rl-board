@@ -10,7 +10,7 @@
 #include <cmath>
 
 #define PI 3.14159265358979323846
-#define MAX_THRUST 100
+#define MAX_THRUST 200
 #define NBPOD 4
 
 using namespace std;
@@ -25,15 +25,15 @@ high_resolution_clock::time_point global_time;
 
 static unsigned long x = 123456789, y = 362436069, z = 521288629;
 unsigned long myrand(void) {
-	unsigned long t;
-	x ^= x << 16;
-	x ^= x >> 5;
-	x ^= x << 1;
-	t = x;
-	x = y;
-	y = z;
-	z = t ^ x ^ y;
-	return z;
+    unsigned long t;
+    x ^= x << 16;
+    x ^= x >> 5;
+    x ^= x << 1;
+    t = x;
+    x = y;
+    y = z;
+    z = t ^ x ^ y;
+    return z;
 }
 
 // TODO : Opti
@@ -194,7 +194,7 @@ class Checkpoint : public Unit
 {
 public:
     Checkpoint(int _id, int _x, int _y):
-        Unit(_id,_x,_y,200.0,0.0,0.0){}
+        Unit(_id,_x,_y,-100.0,0.0,0.0){}
     void bounce(Unit* u);
 };
 
@@ -499,13 +499,16 @@ public:
 
         float t = 0.0;
         bool previousCollision = false;
-        Unit* lasta = NULL;
-        Unit* lastb = NULL;
+        vector<Unit*> lasta;
+        vector<Unit*> lastb;
         while (t < 1.0) {
             Collision firstCol(NULL, NULL, -1.0);
             bool foundCol = false;
             for (int i = 0; i < NBPOD; i++) {
                 for(int j = i+1; j < NBPOD; j++) {
+                    if ((std::find(lasta.begin(), lasta.end(), &pods[i]) != lasta.end()) && (std::find(lastb.begin(), lastb.end(), &pods[j]) != lastb.end())) {
+                        continue;
+                    }
                     Collision* col = pods[i].collision(&pods[j]);
                     if (col != NULL) {
                         if (col->t + t < 1.0 && (!foundCol || col->t < firstCol.t)) {
@@ -514,6 +517,9 @@ public:
                         }
                         delete col;
                     }
+                }
+                if ((std::find(lasta.begin(), lasta.end(), &pods[i]) != lasta.end()) && (std::find(lastb.begin(), lastb.end(), &(circuit.cps[pods[i].ncpid])) != lastb.end())) {
+                    continue;
                 }
                 Collision* col = pods[i].collision(&(circuit.cps[pods[i].ncpid]));
                 if (col != NULL) {
@@ -525,18 +531,22 @@ public:
                 }
             }
 
-            if (!foundCol || (previousCollision && firstCol.t == 0.0 && firstCol.a == lasta && firstCol.b == lastb)) {
+            if (!foundCol) {
                 for (int i = 0; i < NBPOD; i++) {
                     pods[i].move(1.0-t);
                 }
                 t = 1.0;
             } else {
+                if (firstCol.t > 0.0) {
+                    lasta.clear();
+                    lastb.clear();
+                }
                 //assert(firstCol.b != NULL);
                 //assert(firstCol.a != NULL);
                 //assert(firstCol.t != -1.0);
                 previousCollision = true;
-                lasta = firstCol.a;
-                lastb = firstCol.b;
+                lasta.push_back(firstCol.a);
+                lastb.push_back(firstCol.b);
                 for (int i = 0; i < NBPOD; i++) {
                     pods[i].move(firstCol.t);
                 }
@@ -722,7 +732,7 @@ void genetic(int profondeur, int population, float allocated_time, World& world,
         }
         currtime = high_resolution_clock::now();
     }
-    std::cerr << cnt << std::endl;
+    std::cerr << "cnt : " << cnt << std::endl;
 
     // Find best in pop
     int better_sol_id = -1;
@@ -827,14 +837,14 @@ int main()
         }
         float computing_time;
         if (turn == 1) {
-            computing_time = 0.995;
+            computing_time = 0.800;
             if (w.pods[0].distance(w.pods[1]) > 2000)
                 id_player = 1;
             else
                 id_player = 0;
         }
         else
-            computing_time = 0.140;
+            computing_time = 0.068;
 
         #ifdef DEBUG_SIMU_MODE
         if (turn != 1)
