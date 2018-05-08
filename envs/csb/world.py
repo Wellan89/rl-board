@@ -32,7 +32,7 @@ class World:
                 cp0y - sin_angle * (2000.0 - distance_to_center), self),
         ]
         for pod in self.pods:
-            pod.angle = angle - math.pi / 2.0
+            pod.angle = (angle - math.pi / 2.0) * 180.0 / math.pi
 
     def play(self, s1, s2):
         self.turn += 1
