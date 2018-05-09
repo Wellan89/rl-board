@@ -4,8 +4,8 @@ import numpy as np
 
 from csb import csb
 
+import numpy as np
 from envs.csb import renderer
-from envs.csb.util import CLAMP
 # from envs.csb.world import World
 
 DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
@@ -40,7 +40,7 @@ class CsbEnv(gym.Env):
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
-        action = [CLAMP(v, 0.0, 1.0) for v in action]
+        action = np.clip(action, 0.0, 1.0)
 
         last_score = self.world.compute_agent_score()
 
