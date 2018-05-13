@@ -1,12 +1,10 @@
 import os
 import gym
-import numpy as np
 
 from csb import csb
 
 import numpy as np
 from envs.csb import renderer
-# from envs.csb.world import World
 
 DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
 
@@ -18,7 +16,7 @@ class CsbEnv(gym.Env):
 
     def __init__(self):
         self.world = None
-        self.is_new_episode = True
+        self.timesteps = 0
         self.reset()
         self.viewer = None
 
@@ -31,23 +29,28 @@ class CsbEnv(gym.Env):
 
     def reset(self):
         self.world = csb.World()
-        self.is_new_episode = True
+        self.timesteps = 0
         return self._get_state()
 
     def _get_state(self, opponent_view=False):
         return np.array(self.world.compute_state(opponent_view))
+
+    def compute_dense_score(self):
+        return 0.5 * sum(pod.score() for pod in self.world.pods[:2])
+
+    def blocking_score(self):
+        return -10.0 * max(pod.nb_checked() for pod in self.world.pods[2:]) / self.timesteps
 
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
         action = np.clip(action, 0.0, 1.0)
 
-        last_score = self.world.compute_agent_score()
+        last_score = self.compute_dense_score()
 
         opp_solution = None
         if self.opp_solution_predict is not None:
-            opp_solution = self.opp_solution_predict(self._get_state(opponent_view=True), self.is_new_episode)
-        self.is_new_episode = False
+            opp_solution = self.opp_solution_predict(self._get_state(opponent_view=True), (self.timesteps == 0))
 
         # Dummy solution : straight line toward the next checkpoint
         if opp_solution is None:
@@ -59,23 +62,24 @@ class CsbEnv(gym.Env):
         except Exception as e:
             print('An error occurred during game generation!', e)
             return safe_state, 0.0, True, {}
+        self.timesteps += 1
 
         players_won = [self.world.player_won(i) for i in range(2)]
         if players_won[0] and players_won[1]:
             episode_over = True
-            easy_reward = 0.0
+            easy_reward = self.blocking_score()
             raw_reward = 0.0
         elif players_won[1]:
             episode_over = True
-            easy_reward = 0.0
+            easy_reward = self.blocking_score()
             raw_reward = -10.0
         elif players_won[0]:
             episode_over = True
-            easy_reward = 0.0
+            easy_reward = self.blocking_score()
             raw_reward = 10.0
         else:
             episode_over = False
-            easy_reward = self.world.compute_agent_score() - last_score
+            easy_reward = self.compute_dense_score() - last_score
             raw_reward = 0.0
 
         reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward

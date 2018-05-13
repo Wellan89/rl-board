@@ -125,12 +125,6 @@ public:
         }
         return features;
     }
-    float compute_agent_score() {
-        float score = 0;
-        for (int i = 0; i < 2; i++)
-            score += 0.5 * w.pods[i].env_score();
-        return score;
-    }
     vector<float> dummy_opp_solution() {
         vector<float> s;
         s.reserve(6);
@@ -151,7 +145,6 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def("play", &WorldRunner::play)
         .def("player_won", &WorldRunner::player_won)
         .def("compute_state", &WorldRunner::compute_state)
-        .def("compute_agent_score", &WorldRunner::compute_agent_score)
         .def("dummy_opp_solution", &WorldRunner::dummy_opp_solution);
     py::class_<Circuit>(m, "Circuit")
         .def("cp", &Circuit::cp)
@@ -169,6 +162,7 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def_readwrite("angle", &Pod::angle)
         .def_readwrite("shield", &Pod::shield)
         .def_readwrite("boost_available", &Pod::boost_available)
+        .def("nb_checked", &Pod::nb_checked)
         .def("score", &Pod::env_score)
         .def("next_checkpoint", [](Pod& pod) { return circuit.cp(pod.ncpid); });
 }

@@ -274,25 +274,21 @@ public:
             ncpid = 0;
         }
     }
-    float score() {
-        int lastCP = ncpid-1;
+    int nb_checked() {
+        int lastCP = ncpid - 1;
         if (lastCP == -1)
-            lastCP = checkpointCount-1;
-        int nbChecked = lap*checkpointCount+lastCP;
-        return nbChecked*50000-distance(circuit.cp(ncpid));
+            lastCP = circuit.nbcp() - 1;
+        return lap * circuit.nbcp() + lastCP;
+    }
+    float score() {
+        return nb_checked() * 50000 - distance(circuit.cp(ncpid));
     }
     float env_score() {
         Checkpoint& current_cp = circuit.cp((ncpid + circuit.nbcp() - 1) % circuit.nbcp());
         Checkpoint& next_cp = circuit.cp(ncpid);
         float distance_cp_to_ncp = current_cp.distance(next_cp);
         float cp_dist_score = (distance_cp_to_ncp - distance(next_cp)) / distance_cp_to_ncp;
-
-        int lastCP = ncpid - 1;
-        if (lastCP == -1)
-            lastCP = circuit.nbcp() - 1;
-        int nbChecked = lap * circuit.nbcp() + lastCP;
-
-        return nbChecked + cp_dist_score;
+        return nb_checked() + cp_dist_score;
     }
     float getAngle(Point p) {
         return atan2(p.y - y, p.x - x) * 180.0 / PI;

@@ -109,9 +109,6 @@ class World:
     def dummy_opp_solution(self):
         return self.pods[2].to_dummy_move(speed=80.0) + self.pods[3].to_dummy_move(speed=80.0)
 
-    def compute_agent_score(self):
-        return 0.5 * sum(pod.score(use_cp_dist_score=True) for pod in self.pods[:2])
-
     def compute_state(self, opponent_view=False):
         if opponent_view:
             pods = self.pods[2:] + self.pods[:2]

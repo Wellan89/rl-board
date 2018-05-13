@@ -62,7 +62,8 @@ class HardEnvCallback:
 
 
 class VersusCallback:
-    def __init__(self, env, start_iterations, threshold_iterations, default_ai_weight, latest_models_proportion):
+    def __init__(self, env, start_iterations, threshold_iterations, default_ai_weight,
+                 latest_models_proportion, load_first_model):
         self.env = env.unwrapped
         self.env.enable_opponent(self.predict)
 
@@ -70,13 +71,14 @@ class VersusCallback:
         self.threshold_iterations = threshold_iterations
         self.default_ai_weight = default_ai_weight
         self.latest_models_proportion = latest_models_proportion
+        self.load_first_model = load_first_model
 
         self.n_steps_since_last_update = 0
         self.models = []
         self.current_model = None
 
     def __call__(self, local_vars, global_vars):
-        if not self.models and not self.default_ai_weight:
+        if local_vars['iters_so_far'] == 0 and self.load_first_model:
             self.reload(local_vars)
             return
 
@@ -87,20 +89,22 @@ class VersusCallback:
         if self.n_steps_since_last_update < self.threshold_iterations:
             return
 
-        print('VersusCallback: Loading opponent {}'.format(len(self.models)))
         self.reload(local_vars)
         self.n_steps_since_last_update = 0
 
     def reload(self, local_vars):
+        print('VersusCallback: Loading opponent {}'.format(len(self.models)))
         self.models.append(csb_agent.Model(_load_vars_dict(local_vars)))
 
     def predict(self, state, is_new_episode):
         if is_new_episode:
             latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
-            if not latest_models:
+            if self.models and not latest_models:
+                print('VersusCallback: No model selected: using latest model')
                 latest_models = self.models[-1:]
             latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
             if not latest_models:
+                print('VersusCallback: No model avalaible: using default policy')
                 latest_models = [None]
             self.current_model = random.choice(latest_models)
 
@@ -202,9 +206,9 @@ def main():
 
     callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=300, linear_schedule=True),
-        VersusCallback(env=env, start_iterations=20, threshold_iterations=20,
-                       default_ai_weight=3, latest_models_proportion=0.0),
+        HardEnvCallback(env=env, switch_iterations=400, linear_schedule=True),
+        VersusCallback(env=env, start_iterations=20, threshold_iterations=20, default_ai_weight=3,
+                       latest_models_proportion=0.0, load_first_model=False),
     ]
     if rank == 0:
         callbacks += [
