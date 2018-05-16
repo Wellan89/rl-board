@@ -5,7 +5,7 @@
 
 namespace py = pybind11;
 
-vector<vector<Point>> BASE_CONFIGURATIONS = {
+const vector<vector<Point>> BASE_CONFIGURATIONS = {
     {Point(10540, 5980), Point(3580, 5180), Point(13580, 7600), Point(12460, 1350)},
     {Point(13840, 5080), Point(10680, 2280), Point(8700, 7460), Point(7200, 2160), Point(3600, 5280)},
     {Point(7350, 4940), Point(3320, 7230), Point(14580, 7700), Point(10560, 5060), Point(13100, 2320), Point(4560, 2180)},
@@ -29,12 +29,11 @@ public:
     World w;
 
     void generate_map() {
-        nblaps = 3;
-        circuit.cps.clear();
+        w.circuit.nblaps = 3;
+        w.circuit.cps.clear();
 
         int conf_id = rand() % BASE_CONFIGURATIONS.size();
-        checkpointCount = BASE_CONFIGURATIONS[conf_id].size();
-
+        int checkpointCount = BASE_CONFIGURATIONS[conf_id].size();
         int offset = rand() % checkpointCount;
         for (int i = 0; i < checkpointCount; i++) {
             int idx = (i + offset) % checkpointCount;
@@ -44,7 +43,7 @@ public:
                 BASE_CONFIGURATIONS[conf_id][idx].y + rand()%(CHECKPOINT_MAX_DEVIATION+1) - CHECKPOINT_MAX_DEVIATION/2
             );
             cp.r = 200;
-            circuit.cps.push_back(cp);
+            w.circuit.cps.push_back(cp);
         }
     }
 
@@ -52,9 +51,9 @@ public:
         generate_map();
 
         float distance_to_center = 500 + 1000 * rand() % 2;
-        float cp0x = circuit.cp(0).x;
-        float cp0y = circuit.cp(0).y;
-        float angle = PI / 2 + atan2(circuit.cp(1).y - cp0y, circuit.cp(1).x - cp0x);
+        float cp0x = w.circuit.cp(0).x;
+        float cp0y = w.circuit.cp(0).y;
+        float angle = PI / 2 + atan2(w.circuit.cp(1).y - cp0y, w.circuit.cp(1).x - cp0x);
         float cos_angle = cos(angle);
         float sin_angle = sin(angle);
         w.pods[0].x = cp0x + cos_angle * distance_to_center;
@@ -87,18 +86,17 @@ public:
         w.play(s1, s2);
     }
     bool player_won(int player) {
-        if (w.pods[player*2].lap == nblaps || w.pods[player*2+1].lap == nblaps)
+        if (w.pods[player*2].lap == w.circuit.nblaps || w.pods[player*2+1].lap == w.circuit.nblaps)
             return true;
         else if (w.pods[(1-player)*2].timeout < 0 && w.pods[(1-player)*2+1].timeout < 0)
             return true;
-        else
-            return false;
+        return false;
     }
     vector<float> compute_state(bool opponent_view) {
         vector<float> features;
         features.reserve(66);
-        features.push_back(nblaps);
-        features.push_back(circuit.nbcp());
+        features.push_back(w.circuit.nblaps);
+        features.push_back(w.circuit.nbcp());
         for (int _i = 0; _i < 4; _i++) {
             int i = _i;
             if (opponent_view) {
@@ -118,9 +116,9 @@ public:
             features.push_back(w.pods[i].lap);
             features.push_back(w.pods[i].ncpid);
             for (int j = 0; j < 3; j++) {
-                int next_checkpoint_id_j = (w.pods[i].ncpid + j) % circuit.nbcp();
-                features.push_back(circuit.cp(next_checkpoint_id_j).x / 5000.0);
-                features.push_back(circuit.cp(next_checkpoint_id_j).y / 5000.0);
+                int next_checkpoint_id_j = (w.pods[i].ncpid + j) % w.circuit.nbcp();
+                features.push_back(w.circuit.cp(next_checkpoint_id_j).x / 5000.0);
+                features.push_back(w.circuit.cp(next_checkpoint_id_j).y / 5000.0);
             }
         }
         return features;
@@ -129,7 +127,7 @@ public:
         vector<float> s;
         s.reserve(6);
         for (int i = 2; i < 4; i++) {
-            s.push_back((w.pods[i].diffAngle(circuit.cp(w.pods[i].ncpid)) + 18.0) / 36.0);
+            s.push_back((w.pods[i].diffAngle(w.circuit.cp(w.pods[i].ncpid)) + 18.0) / 36.0);
             s.push_back(80.0 / MAX_THRUST);
             s.push_back(0.5);
         }
@@ -140,7 +138,7 @@ public:
 PYBIND11_MODULE(csb_pybind, m) {
     py::class_<WorldRunner>(m, "World")
         .def(py::init<>())
-        .def_property_readonly("circuit", [](WorldRunner&) { return circuit; })
+        .def_property_readonly("circuit", [](WorldRunner& wr) { return wr.w.circuit; })
         .def_property_readonly("pods", [](WorldRunner& wr) { return vector<Pod>(wr.w.pods, wr.w.pods + NBPOD); })
         .def("play", &WorldRunner::play)
         .def("player_won", &WorldRunner::player_won)
@@ -164,5 +162,5 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def_readwrite("boost_available", &Pod::boost_available)
         .def("nb_checked", &Pod::nb_checked)
         .def("score", &Pod::env_score)
-        .def("next_checkpoint", [](Pod& pod) { return circuit.cp(pod.ncpid); });
+        .def("next_checkpoint", [](Pod& pod) { return pod.circuit.cp(pod.ncpid); });
 }
