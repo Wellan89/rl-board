@@ -27,6 +27,10 @@ class CsbEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
                                                 shape=(len(self._get_state()),))
 
+    @classmethod
+    def create_new_instance(cls):
+        return cls()
+
     def reset(self):
         self.world = csb.World()
         self.timesteps = 0
