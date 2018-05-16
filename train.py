@@ -61,11 +61,23 @@ class HardEnvCallback:
         self.env.set_hard_env_weight(hard_env_weight)
 
 
+class OpponentPredictor:
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, state):
+        # The None model is the default AI in the environment
+        if self.model:
+            return self.model.predict(state)
+        else:
+            return None
+
+
 class VersusCallback:
     def __init__(self, env, start_iterations, threshold_iterations, default_ai_weight,
                  latest_models_proportion, load_first_model):
         self.env = env.unwrapped
-        self.env.enable_opponent(self.predict)
+        self.env.set_opponent_factory(self.make_opponent)
 
         self.start_iterations = start_iterations
         self.threshold_iterations = threshold_iterations
@@ -75,7 +87,6 @@ class VersusCallback:
 
         self.n_steps_since_last_update = 0
         self.models = []
-        self.current_model = None
 
     def __call__(self, local_vars, global_vars):
         if local_vars['iters_so_far'] == 0 and self.load_first_model:
@@ -96,22 +107,16 @@ class VersusCallback:
         print('VersusCallback: Loading opponent {}'.format(len(self.models)))
         self.models.append(csb_agent.Model(_load_vars_dict(local_vars)))
 
-    def predict(self, state, is_new_episode):
-        if is_new_episode:
-            latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
-            if self.models and not latest_models:
-                print('VersusCallback: No model selected: using latest model')
-                latest_models = self.models[-1:]
-            latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
-            if not latest_models:
-                print('VersusCallback: No model avalaible: using default policy')
-                latest_models = [None]
-            self.current_model = random.choice(latest_models)
-
-        if self.current_model:
-            return self.current_model.predict(state)
-        else:
-            return None
+    def make_opponent(self):
+        latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
+        if self.models and not latest_models:
+            print('VersusCallback: No model selected: using latest model')
+            latest_models = self.models[-1:]
+        latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
+        if not latest_models:
+            print('VersusCallback: No model avalaible: using default policy')
+            latest_models = [None]
+        return OpponentPredictor(model=random.choice(latest_models))
 
 
 class ReloadCallback:
