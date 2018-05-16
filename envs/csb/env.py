@@ -38,8 +38,11 @@ class CsbEnv(gym.Env):
     def compute_dense_score(self):
         return 0.5 * sum(pod.score() for pod in self.world.pods[:2])
 
+    def compute_distance_score(self):
+        return max(pod.score() for pod in self.world.pods[:2]) - max(pod.score() for pod in self.world.pods[2:])
+
     def blocking_score(self):
-        return -10.0 * max(pod.nb_checked() for pod in self.world.pods[2:]) / self.timesteps
+        return -50.0 * max(pod.nb_checked() for pod in self.world.pods[2:]) / self.timesteps
 
     def step(self, action):
         # assert (len(action),) == self.action_space.shape
@@ -47,6 +50,7 @@ class CsbEnv(gym.Env):
         action = np.clip(action, 0.0, 1.0)
 
         last_score = self.compute_dense_score()
+        last_distance_score = self.compute_distance_score()
 
         opp_solution = None
         if self.opp_solution_predict is not None:
@@ -59,32 +63,44 @@ class CsbEnv(gym.Env):
         safe_state = self._get_state()
         try:
             self.world.play(action, opp_solution)
+
+            state = self._get_state()
+            nans = [np.any(np.isnan(action)), np.any(np.isnan(opp_solution)), np.any(np.isnan(state))]
+            if any(nans):
+                print('NaN value found:', nans)
+                print('action:', action)
+                print('opp_solution:', opp_solution)
+                print('state:', state)
+                raise RuntimeError('NaN value found')
+
         except Exception as e:
             print('An error occurred during game generation!', e)
             return safe_state, 0.0, True, {}
         self.timesteps += 1
 
+        easy_reward = self.compute_dense_score() - last_score
+        distance_score = self.compute_distance_score() - last_distance_score
         players_won = [self.world.player_won(i) for i in range(2)]
         if players_won[0] and players_won[1]:
             episode_over = True
-            easy_reward = self.blocking_score()
             raw_reward = 0.0
         elif players_won[1]:
             episode_over = True
-            easy_reward = self.blocking_score()
             raw_reward = -10.0
         elif players_won[0]:
             episode_over = True
-            easy_reward = self.blocking_score()
             raw_reward = 10.0
         else:
             episode_over = False
-            easy_reward = self.compute_dense_score() - last_score
             raw_reward = 0.0
+
+        raw_reward += distance_score
+        if episode_over:
+            raw_reward += self.blocking_score()
 
         reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
-        return self._get_state(), reward, episode_over, {}
+        return state, reward, episode_over, {}
 
     def render(self, mode='human'):
         if DISABLE_RENDERING:
