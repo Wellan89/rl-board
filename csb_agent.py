@@ -33,13 +33,14 @@ class Model:
         return cls(weights=weights)
 
     def predict(self, state):
-        obz = np.array(state, dtype=np.float64)
+        obz = np.asarray(state)
         state_mean = self.weights['pi/obfilter/runningsum:0'] / self.weights['pi/obfilter/count:0']
         state_std = np.sqrt(np.maximum(
             (self.weights['pi/obfilter/runningsumsq:0'] / self.weights['pi/obfilter/count:0']) - np.square(state_mean),
             1e-2
         ))
         obz = np.clip((obz - state_mean) / state_std, -5.0, 5.0)
+        obz = np.asarray(obz, dtype=np.float32)
 
         action = np.tanh(_matmul(obz, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
         action = np.tanh(_matmul(action, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
