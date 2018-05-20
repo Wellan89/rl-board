@@ -9,3 +9,11 @@ register(
     id='csb-d1-v1',
     entry_point='envs.csb.env:CsbEnvD1',
 )
+register(
+    id='csb-d2-v1',
+    entry_point='envs.csb.env:CsbEnvD2',
+)
+register(
+    id='csb-d3-v1',
+    entry_point='envs.csb.env:CsbEnvD3',
+)

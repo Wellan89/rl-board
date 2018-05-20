@@ -187,9 +187,9 @@ public:
 class Pod : public Unit
 {
 public:
-    Pod(Circuit& _circuit):
+    Pod(Circuit* _circuit):
         Unit(-1,0.0,0.0,400.0,0.0,0.0), circuit(_circuit) {}
-    Circuit& circuit;
+    Circuit* circuit;
     float angle=0.0;
     int ncpid=1;
     int timeout=100;
@@ -204,22 +204,22 @@ public:
         ncpid++;
         if (ncpid == 1)
             lap++;
-        if (ncpid >= circuit.nbcp()) {
+        if (ncpid >= circuit->nbcp()) {
             ncpid = 0;
         }
     }
     int nb_checked() {
         int lastCP = ncpid - 1;
         if (lastCP == -1)
-            lastCP = circuit.nbcp() - 1;
-        return lap * circuit.nbcp() + lastCP;
+            lastCP = circuit->nbcp() - 1;
+        return lap * circuit->nbcp() + lastCP;
     }
     float score() {
-        return nb_checked() * 50000 - distance(circuit.cp(ncpid));
+        return nb_checked() * 50000 - distance(circuit->cp(ncpid));
     }
     float env_score() {
-        Checkpoint& current_cp = circuit.cp((ncpid + circuit.nbcp() - 1) % circuit.nbcp());
-        Checkpoint& next_cp = circuit.cp(ncpid);
+        Checkpoint& current_cp = circuit->cp((ncpid + circuit->nbcp() - 1) % circuit->nbcp());
+        Checkpoint& next_cp = circuit->cp(ncpid);
         float distance_cp_to_ncp = current_cp.distance(next_cp);
         float cp_dist_score = (distance_cp_to_ncp - distance(next_cp)) / distance_cp_to_ncp;
         return nb_checked() + cp_dist_score;
@@ -379,7 +379,25 @@ class World
 public:
     World(){}
     Circuit circuit;
-    Pod pods[NBPOD] = {Pod(circuit), Pod(circuit), Pod(circuit), Pod(circuit)};
+    Pod pods[NBPOD] = {Pod(&circuit), Pod(&circuit), Pod(&circuit), Pod(&circuit)};
+
+    Pod save_pods[NBPOD] = {Pod(&circuit), Pod(&circuit), Pod(&circuit), Pod(&circuit)};
+    void save() {
+        for (int i = 0; i < NBPOD; i++)
+            save_pods[i] = pods[i];
+    }
+    void rollback() {
+        for (int i = 0; i < NBPOD; i++)
+            pods[i] = save_pods[i];
+    }
+    World reverse() {
+        World reversedWorld(*this);
+        reversedWorld.pods[0] = pods[2];
+        reversedWorld.pods[1] = pods[3];
+        reversedWorld.pods[2] = pods[0];
+        reversedWorld.pods[3] = pods[1];
+        return reversedWorld;
+    }
 
     void play(Solution& s1, Solution& s2) {
         for (int i = 0; i < NBPOD; i++) {
@@ -395,7 +413,6 @@ public:
         pods[3].apply_move(s2.mv[1]);
 
         float t = 0.0;
-        bool previousCollision = false;
         vector<Unit*> lasta;
         vector<Unit*> lastb;
         while (t < 1.0) {
@@ -441,7 +458,6 @@ public:
                 //assert(firstCol.b != NULL);
                 //assert(firstCol.a != NULL);
                 //assert(firstCol.t != -1.0);
-                previousCollision = true;
                 lasta.push_back(firstCol.a);
                 lastb.push_back(firstCol.b);
                 for (int i = 0; i < NBPOD; i++) {
@@ -489,5 +505,129 @@ public:
         return ret;
     }
 };
+
+Move convert_to_move(Pod p, Point& dest) {
+    Move mv;
+    mv.g3 = 0.5;
+    mv.g2 = 1.0;
+    float diffA = p.diffAngle(dest);
+    mv.g1 = LIN(diffA,-18.0,0.25,18.0,0.75);
+    if (mv.g1 > 1)
+        mv.g1 = 1;
+    if (mv.g1 < 0)
+        mv.g1 = 0;
+    return mv;
+}
+
+void genetic(int profondeur, int population, int nb_simulations, World& world, Solution* otherPlayer, Solution* output) {
+    world.save();
+
+    Solution pop[population][profondeur];
+    float evals[population];
+
+    // Generate initial population
+    for (int i = 0; i < population; i++) {
+        for (int j = 0; j < profondeur; j++) {
+            pop[i][j].randomize();
+        }
+    }
+
+    // Eval initial population
+    for (int i = 0; i < population; i++) {
+        world.rollback();
+        for (int j = 0; j < profondeur; j++) {
+            world.play(pop[i][j],otherPlayer[j]);
+        }
+        evals[i] = world.eval();
+    }
+
+    // Find solution to replace
+    float current_min = numeric_limits<float>::max();
+    int current_min_id=-1;
+    for (int i = 0; i < population; i++) {
+        if (evals[i] < current_min) {
+            current_min = evals[i];
+            current_min_id = i;
+        }
+    }
+    //assert(current_min_id >= 0 && current_min_id < population);
+
+    int cur_nb_simulations = 0;
+    while (cur_nb_simulations < nb_simulations)
+    {
+        cur_nb_simulations++;
+
+        world.rollback();
+        Solution newsol[profondeur];
+
+        int randid = rand()%population;
+        for (int i = 0; i < profondeur; i++) {
+            newsol[i] = pop[randid][i];
+        }
+
+        for (int i = 0; i < profondeur; i++) {
+            newsol[i].mutate(1.0f - float(cur_nb_simulations) / float(nb_simulations));
+            world.play(newsol[i], otherPlayer[i]);
+        }
+
+        float current_eval = world.eval();
+        if (current_eval > current_min) {
+            current_min = current_eval;
+            for (int j = 0; j < profondeur; j++) {
+                pop[current_min_id][j] = newsol[j];
+            }
+            evals[current_min_id] = current_eval;
+            for (int i = 0; i < population; i++) {
+                if (evals[i] < current_min) {
+                    current_min = evals[i];
+                    current_min_id = i;
+                }
+            }
+            //assert(current_min_id >= 0 && current_min_id < population);
+        }
+    }
+
+    // Find best in pop
+    int better_sol_id = -1;
+    float current_max = -numeric_limits<float>::max();
+    for (int i = 0; i < population; i++) {
+        if (evals[i] > current_max) {
+            current_max = evals[i];
+            better_sol_id = i;
+        }
+    }
+    //assert(better_sol_id >= 0 && better_sol_id < population);
+    world.rollback();
+    for (int i = 0; i < profondeur; i++) {
+        output[i] = pop[better_sol_id][i];
+    }
+}
+
+Solution runGenetic(World& w, int prof, int pop, int nb_simulations) {
+    Solution emptyMoves[prof];
+    Solution otherPlayer[prof];
+    World doom_bot = w;
+    for (int i = 0; i < prof; i++) {
+        Point d1, d2;
+        if (doom_bot.pods[0].score() > doom_bot.pods[1].score()) {
+            d1 = w.circuit.cp(doom_bot.pods[0].ncpid);
+            d2 = (doom_bot.pods[2].score() > doom_bot.pods[3].score())?doom_bot.pods[2]:doom_bot.pods[3];
+        } else {
+            d1 = (doom_bot.pods[2].score() > doom_bot.pods[3].score())?doom_bot.pods[2]:doom_bot.pods[3];
+            d2 = w.circuit.cp(doom_bot.pods[1].ncpid);
+        }
+        otherPlayer[i].mv[0] = convert_to_move(doom_bot.pods[0],d1);
+        otherPlayer[i].mv[1] = convert_to_move(doom_bot.pods[1],d2);
+        doom_bot.play(otherPlayer[i], emptyMoves[i]);
+    }
+
+    World reversedWorld = w.reverse();
+    Solution enemyMoves[prof];
+    genetic(prof, pop, int(nb_simulations * 0.15f), reversedWorld, otherPlayer, enemyMoves);
+
+    Solution output[prof];
+    genetic(prof, pop, int(nb_simulations * 0.85f), w, enemyMoves, output);
+    return output[0];
+}
 
 #endif

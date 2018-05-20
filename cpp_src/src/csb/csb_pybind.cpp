@@ -123,13 +123,24 @@ public:
         }
         return features;
     }
-    vector<float> dummy_opp_solution() {
+    vector<float> dummy_opp_solution(int genetic_opponent_simulations) {
         vector<float> s;
         s.reserve(6);
-        for (int i = 2; i < 4; i++) {
-            s.push_back((w.pods[i].diffAngle(w.circuit.cp(w.pods[i].ncpid)) + 18.0) / 36.0);
-            s.push_back(80.0 / MAX_THRUST);
-            s.push_back(0.5);
+        if (genetic_opponent_simulations > 0) {
+            // NB: On CodinGame, the average number of simulations for a turn is 12000 (in 75ms)
+            World reversedWorld = w.reverse();
+            Solution solution = runGenetic(reversedWorld, 8, 10, genetic_opponent_simulations);
+            for (int i = 0; i < 2; i++) {
+                s.push_back(solution.mv[i].g1);
+                s.push_back(solution.mv[i].g2);
+                s.push_back(solution.mv[i].g3);
+            }
+        } else {
+            for (int i = 2; i < 4; i++) {
+                s.push_back((w.pods[i].diffAngle(w.circuit.cp(w.pods[i].ncpid)) + 18.0) / 36.0);
+                s.push_back(80.0 / MAX_THRUST);
+                s.push_back(0.5);
+            }
         }
         return s;
     }
@@ -162,5 +173,6 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def_readwrite("boost_available", &Pod::boost_available)
         .def("nb_checked", &Pod::nb_checked)
         .def("score", &Pod::env_score)
-        .def("next_checkpoint", [](Pod& pod) { return pod.circuit.cp(pod.ncpid); });
+        .def("next_checkpoint", [](Pod& pod) { return pod.circuit->cp(pod.ncpid); });
+    m.def("srand", []() { srand(time(NULL)); });
 }

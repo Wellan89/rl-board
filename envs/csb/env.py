@@ -8,11 +8,15 @@ from envs.csb import renderer
 
 DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
 
+csb.srand()
+
 
 class CsbEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array'] if not DISABLE_RENDERING else []}
     reward_range = (-np.inf, np.inf)
     spec = None
+
+    genetic_opponent_simulations = -1
 
     def __init__(self):
         self.world = None
@@ -70,7 +74,7 @@ class CsbEnv(gym.Env):
 
         # Dummy solution : straight line toward the next checkpoint
         if opp_solution is None:
-            opp_solution = self.world.dummy_opp_solution()
+            opp_solution = self.world.dummy_opp_solution(self.genetic_opponent_simulations)
 
         safe_state = self._get_state()
         try:
@@ -134,6 +138,16 @@ class CsbEnvD0(CsbEnv):
 
 
 class CsbEnvD1(CsbEnv):
+    def __init__(self):
+        super().__init__()
+        self.set_hard_env_weight(weight=1.0)
+
+
+class CsbEnvD2(CsbEnv):
+    genetic_opponent_simulations = 1000
+
+
+class CsbEnvD3(CsbEnvD2):
     def __init__(self):
         super().__init__()
         self.set_hard_env_weight(weight=1.0)
