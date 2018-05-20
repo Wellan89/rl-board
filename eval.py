@@ -2,7 +2,6 @@ import argparse
 import datetime
 import math
 import multiprocessing
-import os
 
 from scipy import stats
 from tensorforce.contrib.openai_gym import OpenAIGym
@@ -10,6 +9,7 @@ from tensorforce.contrib.openai_gym import OpenAIGym
 import checkpoints_utils
 import csb_agent
 import envs
+from train import OpponentPredictor
 
 
 def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
@@ -20,7 +20,7 @@ def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
             monitor_video=1 if episode_id == 0 else 0
         )
         if versus_model:
-            environment.gym.unwrapped.opp_solution_predict = lambda _state, _: versus_model.predict(_state)
+            environment.gym.unwrapped.set_opponent_factory(lambda: OpponentPredictor(model=versus_model))
         state = environment.reset()
         reward = 0.0
         while True:

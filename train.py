@@ -212,8 +212,8 @@ def main():
     callbacks += [
         ReloadCallback(model_path=args.load),
         HardEnvCallback(env=env, switch_iterations=300, linear_schedule=True),
-        VersusCallback(env=env, start_iterations=20, threshold_iterations=20, default_ai_weight=3,
-                       latest_models_proportion=0.0, load_first_model=False),
+        VersusCallback(env=env, start_iterations=20, threshold_iterations=20, default_ai_weight=2,
+                       latest_models_proportion=0.5, load_first_model=False),
     ]
     if rank == 0:
         callbacks += [
