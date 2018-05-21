@@ -111,8 +111,8 @@ class CsbEnv(gym.Env):
             raw_reward = 0.0
 
         raw_reward += distance_score
-        if episode_over:
-            raw_reward += self.blocking_score()
+        # if episode_over:
+        #     raw_reward += self.blocking_score()
 
         reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
