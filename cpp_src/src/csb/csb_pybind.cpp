@@ -146,7 +146,9 @@ public:
     }
 };
 
+
 PYBIND11_MODULE(csb_pybind, m) {
+    m.def("srand", []() { srand(time(NULL)); });
     py::class_<WorldRunner>(m, "World")
         .def(py::init<>())
         .def_property_readonly("circuit", [](WorldRunner& wr) { return wr.w.circuit; })
@@ -174,5 +176,4 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def("nb_checked", &Pod::nb_checked)
         .def("score", &Pod::env_score)
         .def("next_checkpoint", [](Pod& pod) { return pod.circuit->cp(pod.ncpid); });
-    m.def("srand", []() { srand(time(NULL)); });
 }

@@ -2,10 +2,10 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
-import os
 
-__version__ = '0.0.1'
-SRC_DIR = "src"
+__version__ = '0.0.2'
+
+envs = ['csb', 'stc']
 
 # Based on https://github.com/pybind/python_example
 
@@ -24,24 +24,20 @@ class get_pybind_include(object):
         return pybind11.get_include(self.user)
 
 
-src_cpp = set(map(lambda x: os.path.join(SRC_DIR, x), filter(lambda x: x.endswith('.cpp'), os.listdir(SRC_DIR))))
-
 ext_modules = [
     Extension(
-        'csb_pybind',
-        list({
-            'src/csb/csb_pybind.cpp',
-        } | src_cpp),
+        '{env}_pybind'.format(env=env),
+        ['src/{env}/{env}_pybind.cpp'.format(env=env)],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
             get_pybind_include(user=True),
             # Path to source code
-            SRC_DIR,
+            'src',
         ],
         language='c++',
         extra_compile_args=[],
-    ),
+    ) for env in envs
 ]
 
 
@@ -92,14 +88,14 @@ class BuildExt(build_ext):
             else:
                 raise RuntimeError(
                     'libc++ is needed! Failed to compile with {} and {}.'.
-                    format(" ".join(all_flags), all_flags[0])
+                    format(' '.join(all_flags), all_flags[0])
                 )
         ct = self.compiler.compiler_type
         opts = self.c_opts.get(ct, [])
         if ct == 'unix':
             opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
             opts.append(cpp_flag(self.compiler))
-            opts += ['-Ofast', '-march=native', '-DNDEBUG']
+            opts += ['-Ofast', '-funroll-loops', '-march=native', '-DNDEBUG']
             if has_flag(self.compiler, ['-fvisibility=hidden']):
                 opts.append('-fvisibility=hidden')
         elif ct == 'msvc':
@@ -115,11 +111,9 @@ setup(
     name='cpp',
     version=__version__,
     ext_modules=ext_modules,
-    install_requires=['pybind11>=2.2', "setuptools>=0.7.0", "numpy"],
+    install_requires=['pybind11>=2.2', 'setuptools>=0.7.0', 'numpy'],
     cmdclass={'build_ext': BuildExt},
-    packages=[
-        str('csb'),
-    ],
-    package_dir={str(''): str('python')},
+    packages=['cpp'],
+    package_dir={'': 'python'},
     zip_safe=False,
 )

@@ -1,49 +1,28 @@
-import os
 import gym
-
-from csb import csb
-
 import numpy as np
+
+from cpp import csb_pybind
+from envs import opp_env
 from envs.csb import renderer
 
-DISABLE_RENDERING = bool(int(os.environ.get('DISABLE_RENDERING', 0)))
-
-csb.srand()
+csb_pybind.srand()
 
 
-class CsbEnv(gym.Env):
-    metadata = {'render.modes': ['human', 'rgb_array'] if not DISABLE_RENDERING else []}
-    reward_range = (-np.inf, np.inf)
-    spec = None
-
+class CsbEnv(opp_env.OppEnv):
     genetic_opponent_simulations = -1
 
     def __init__(self):
+        super().__init__()
         self.world = None
-        self.timesteps = 0
-        self.opponent_predict = None
-        self.reset()
-        self.viewer = None
 
-        self.raw_rewards_weight = 0.0
-        self.opponent_factory = None
+        self.reset()
 
         self.action_space = gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32, shape=(6,))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, dtype=np.float32,
                                                 shape=(len(self._get_state()),))
 
-    def create_new_instance(self):
-        env = self.__class__()
-        env.set_hard_env_weight(self.raw_rewards_weight)
-        # assert env.raw_rewards_weight == self.raw_rewards_weight
-        env.set_opponent_factory(self.opponent_factory)
-        # assert env.opponent_factory is self.opponent_factory
-        return env
-
-    def reset(self):
-        self.world = csb.World()
-        self.timesteps = 0
-        self.opponent_predict = None
+    def _reset(self):
+        self.world = csb_pybind.World()
         return self._get_state()
 
     def _get_state(self, opponent_view=False):
@@ -63,18 +42,12 @@ class CsbEnv(gym.Env):
         # assert all(self.action_space.low <= v <= self.action_space.high for v in action)
         action = np.clip(action, 0.0, 1.0)
 
+        opp_solution = self._compute_opp_solution(
+            dummy_opp_solution_func=lambda: self.world.dummy_opp_solution(self.genetic_opponent_simulations)
+        )
+
         last_score = self.compute_dense_score()
         last_distance_score = self.compute_distance_score()
-
-        if self.timesteps == 0 and self.opponent_factory:
-            self.opponent_predict = self.opponent_factory()
-        opp_solution = None
-        if self.opponent_predict is not None:
-            opp_solution = self.opponent_predict(self._get_state(opponent_view=True))
-
-        # Dummy solution : straight line toward the next checkpoint
-        if opp_solution is None:
-            opp_solution = self.world.dummy_opp_solution(self.genetic_opponent_simulations)
 
         safe_state = self._get_state()
         try:
@@ -114,23 +87,12 @@ class CsbEnv(gym.Env):
         # if episode_over:
         #     raw_reward += self.blocking_score()
 
-        reward = (1.0 - self.raw_rewards_weight) * easy_reward + self.raw_rewards_weight * raw_reward
+        reward = (1.0 - self.hard_env_weight) * easy_reward + self.hard_env_weight * raw_reward
         # assert self.reward_range[0] <= reward <= self.reward_range[1]
         return state, reward, episode_over, {}
 
-    def render(self, mode='human'):
-        if DISABLE_RENDERING:
-            return None
-
-        self.viewer, rendered = renderer.render(world=self.world, viewer=self.viewer, mode=mode)
-        return rendered
-
-    def set_hard_env_weight(self, weight):
-        assert 0.0 <= weight <= 1.0
-        self.raw_rewards_weight = weight
-
-    def set_opponent_factory(self, opponent_factory):
-        self.opponent_factory = opponent_factory
+    def _render(self, viewer, mode):
+        return renderer.render(world=self.world, viewer=viewer, mode=mode)
 
 
 class CsbEnvD0(CsbEnv):
