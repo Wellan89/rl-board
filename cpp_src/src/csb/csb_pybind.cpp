@@ -148,7 +148,8 @@ public:
 
 
 PYBIND11_MODULE(csb_pybind, m) {
-    m.def("srand", []() { srand(time(NULL)); });
+    m.def("srand", [](unsigned int seed) { srand(seed); });
+
     py::class_<WorldRunner>(m, "World")
         .def(py::init<>())
         .def_property_readonly("circuit", [](WorldRunner& wr) { return wr.w.circuit; })
@@ -157,14 +158,17 @@ PYBIND11_MODULE(csb_pybind, m) {
         .def("player_won", &WorldRunner::player_won)
         .def("compute_state", &WorldRunner::compute_state)
         .def("dummy_opp_solution", &WorldRunner::dummy_opp_solution);
+
     py::class_<Circuit>(m, "Circuit")
         .def("cp", &Circuit::cp)
         .def("nbcp", &Circuit::nbcp);
+
     py::class_<Checkpoint>(m, "Checkpoint")
         .def_readwrite("id", &Checkpoint::id)
         .def_readwrite("x", &Checkpoint::x)
         .def_readwrite("y", &Checkpoint::y)
         .def_readwrite("r", &Checkpoint::r);
+
     py::class_<Pod>(m, "Pod")
         .def_readwrite("id", &Pod::id)
         .def_readwrite("x", &Pod::x)

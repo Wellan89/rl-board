@@ -45,7 +45,7 @@ public:
         return features;
     }
     int dummy_opp_solution(int nb_opp_simulations) const {
-        int s = 0;
+        int empty_col = 2;
         int max_rows_empty = 0;
         for (int j = 0; j < NB_COLUMNS; j++) {
             int rows_empty = 0;
@@ -53,16 +53,30 @@ public:
                 ++rows_empty;
             if (rows_empty > max_rows_empty) {
                 max_rows_empty = rows_empty;
-                s = j;
+                empty_col = j;
             }
         }
-        return s;
+        switch (empty_col) {
+        case 0:
+            return 16;
+        case 1:
+            return 19;
+        case 2:
+            return 1;
+        case 3:
+            return 5;
+        case 4:
+            return 9;
+        case 5:
+            return 12;
+        }
+        return 1;
     }
 };
 
 
 PYBIND11_MODULE(stc_pybind, m) {
-    m.def("srand", []() { srand(time(NULL)); });
+    m.def("srand", [](unsigned int seed) { srand(seed); });
 
     py::class_<World>(m, "World")
         .def(py::init<>())

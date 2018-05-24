@@ -1,9 +1,18 @@
+import collections
 import math
 
-from envs.csb.vincent_algo import Pos
+Pos = collections.namedtuple('Pos', ['x', 'y'])
 
 VIEWPORT_W = 710
 VIEWPORT_H = 400
+
+
+def _pos_to_screen(_p):
+    return _p.x * VIEWPORT_W / 16000, _p.y * VIEWPORT_H / 9000
+
+
+def _radius_to_screen(_r):
+    return _r * VIEWPORT_W / 16000
 
 
 def render(world, viewer=None, mode='human'):
@@ -11,12 +20,6 @@ def render(world, viewer=None, mode='human'):
 
     if viewer is None:
         viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
-
-    def _pos_to_screen(_p):
-        return _p.x * VIEWPORT_W / 16000, _p.y * VIEWPORT_H / 9000
-
-    def _radius_to_screen(_r):
-        return _r * VIEWPORT_W / 16000
 
     cp_radius = _radius_to_screen(world.circuit.cp(0).r + world.pods[0].r)
     for i in range(world.circuit.nbcp()):

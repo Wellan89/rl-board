@@ -1,10 +1,13 @@
+import random
+
 import gym
 import numpy as np
 
 from cpp import stc_pybind
 from envs import opp_env
+from envs.stc import renderer
 
-stc_pybind.srand()
+stc_pybind.srand(random.SystemRandom().getrandbits(32))
 
 
 class StcEnv(opp_env.OppEnv):
@@ -53,8 +56,7 @@ class StcEnv(opp_env.OppEnv):
         return self._get_state(), reward, episode_over, {}
 
     def _render(self, viewer, mode):
-        # TODO
-        return None, None
+        return renderer.render(world=self.world, viewer=viewer, mode=mode)
 
 
 class StcEnvD0(StcEnv):

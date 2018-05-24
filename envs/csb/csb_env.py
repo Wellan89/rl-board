@@ -1,3 +1,5 @@
+import random
+
 import gym
 import numpy as np
 
@@ -5,7 +7,7 @@ from cpp import csb_pybind
 from envs import opp_env
 from envs.csb import renderer
 
-csb_pybind.srand()
+csb_pybind.srand(random.SystemRandom().getrandbits(32))
 
 
 class CsbEnv(opp_env.OppEnv):
