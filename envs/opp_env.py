@@ -11,7 +11,8 @@ class OppEnv(gym.Env):
     reward_range = (-np.inf, np.inf)
     spec = None
 
-    def __init__(self):
+    def __init__(self, model_class):
+        self.model_class = model_class
         self.timesteps = 0
         self.opponent_predict = None
         self.viewer = None

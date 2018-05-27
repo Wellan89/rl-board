@@ -21,8 +21,8 @@ public:
         if (player_lost[0] || player_lost[1]) {
             return 0.0f;
         }
-        std::pair<float, float> scores = state.play(cmd1, cmd2);
-        return scores.first;
+        std::pair<float, float> rewards = state.play(cmd1, cmd2);
+        return rewards.first;
     }
     bool player_won(int player) const {
         return player_lost[1 - player];
@@ -45,32 +45,23 @@ public:
         return features;
     }
     int dummy_opp_solution(int nb_opp_simulations) const {
-        int empty_col = 2;
-        int max_rows_empty = 0;
-        for (int j = 0; j < NB_COLUMNS; j++) {
-            int rows_empty = 0;
-            while (rows_empty < NB_LINES && state.oppGrid[Pos(rows_empty, j)] == EMPTY_CELL)
-                ++rows_empty;
-            if (rows_empty > max_rows_empty) {
-                max_rows_empty = rows_empty;
-                empty_col = j;
+        if (nb_opp_simulations > 0) {
+            // NB: On CodinGame, the average number of simulations for a turn is 150000 (in 100ms)
+            return getCommandIdx(computeBestCommand(state.reversed(), nb_opp_simulations));
+        } else {
+            int empty_col = 2;
+            int max_rows_empty = 0;
+            for (int j = 0; j < NB_COLUMNS; j++) {
+                int rows_empty = 0;
+                while (rows_empty < NB_LINES && state.oppGrid[Pos(rows_empty, j)] == EMPTY_CELL)
+                    ++rows_empty;
+                if (rows_empty > max_rows_empty) {
+                    max_rows_empty = rows_empty;
+                    empty_col = j;
+                }
             }
+            return getCommandIdx(Command(empty_col, 1));
         }
-        switch (empty_col) {
-        case 0:
-            return 16;
-        case 1:
-            return 19;
-        case 2:
-            return 1;
-        case 3:
-            return 5;
-        case 4:
-            return 9;
-        case 5:
-            return 12;
-        }
-        return 1;
     }
 };
 

@@ -390,7 +390,7 @@ public:
         for (int i = 0; i < NBPOD; i++)
             pods[i] = save_pods[i];
     }
-    World reverse() {
+    World reversed() {
         World reversedWorld(*this);
         reversedWorld.pods[0] = pods[2];
         reversedWorld.pods[1] = pods[3];
@@ -519,7 +519,7 @@ Move convert_to_move(Pod p, Point& dest) {
     return mv;
 }
 
-void genetic(int profondeur, int population, int nb_simulations, World& world, Solution* otherPlayer, Solution* output) {
+void genetic(int profondeur, int population, int nb_simulations, World world, Solution* otherPlayer, Solution* output) {
     world.save();
 
     Solution pop[population][profondeur];
@@ -603,7 +603,7 @@ void genetic(int profondeur, int population, int nb_simulations, World& world, S
     }
 }
 
-Solution runGenetic(World& w, int prof, int pop, int nb_simulations) {
+Solution runGenetic(World w, int prof, int pop, int nb_simulations) {
     Solution emptyMoves[prof];
     Solution otherPlayer[prof];
     World doom_bot = w;
@@ -621,9 +621,8 @@ Solution runGenetic(World& w, int prof, int pop, int nb_simulations) {
         doom_bot.play(otherPlayer[i], emptyMoves[i]);
     }
 
-    World reversedWorld = w.reverse();
     Solution enemyMoves[prof];
-    genetic(prof, pop, int(nb_simulations * 0.15f), reversedWorld, otherPlayer, enemyMoves);
+    genetic(prof, pop, int(nb_simulations * 0.15f), w.reversed(), otherPlayer, enemyMoves);
 
     Solution output[prof];
     genetic(prof, pop, int(nb_simulations * 0.85f), w, enemyMoves, output);

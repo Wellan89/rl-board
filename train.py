@@ -15,7 +15,6 @@ from baselines.ppo1 import pposgd_simple, mlp_policy
 
 import envs
 import checkpoints_utils
-import csb_agent
 
 
 def _load_vars_dict(local_vars):
@@ -105,7 +104,7 @@ class VersusCallback:
 
     def reload(self, local_vars):
         print('VersusCallback: Loading opponent {}'.format(len(self.models)))
-        self.models.append(csb_agent.Model(_load_vars_dict(local_vars)))
+        self.models.append(self.env.model_class(weights=_load_vars_dict(local_vars)))
 
     def make_opponent(self):
         latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
@@ -175,7 +174,7 @@ class VideoMonitorCallback:
             return
 
         monitor_path = os.path.join(self.log_dir, 'video_monitor/{}'.format(local_vars['iters_so_far']))
-        model = csb_agent.Model(_load_vars_dict(local_vars))
+        model = self.env.model_class(weights=_load_vars_dict(local_vars))
         threading.Thread(target=self._do_monitor, args=(monitor_path, model)).start()
 
 

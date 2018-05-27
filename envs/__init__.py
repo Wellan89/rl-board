@@ -26,3 +26,11 @@ register(
     id='stc-d1-v1',
     entry_point='envs.stc.stc_env:StcEnvD1',
 )
+register(
+    id='stc-d2-v1',
+    entry_point='envs.stc.stc_env:StcEnvD2',
+)
+register(
+    id='stc-d3-v1',
+    entry_point='envs.stc.stc_env:StcEnvD3',
+)

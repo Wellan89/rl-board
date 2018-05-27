@@ -123,13 +123,12 @@ public:
         }
         return features;
     }
-    vector<float> dummy_opp_solution(int genetic_opponent_simulations) {
+    vector<float> dummy_opp_solution(int nb_opp_simulations) {
         vector<float> s;
         s.reserve(6);
-        if (genetic_opponent_simulations > 0) {
+        if (nb_opp_simulations > 0) {
             // NB: On CodinGame, the average number of simulations for a turn is 12000 (in 75ms)
-            World reversedWorld = w.reverse();
-            Solution solution = runGenetic(reversedWorld, 8, 10, genetic_opponent_simulations);
+            Solution solution = runGenetic(w.reversed(), 8, 10, nb_opp_simulations);
             for (int i = 0; i < 2; i++) {
                 s.push_back(solution.mv[i].g1);
                 s.push_back(solution.mv[i].g2);

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -69,6 +70,10 @@ struct Command
 
         return true;
     }
+
+    bool operator==(const Command& other) const {
+        return (column == other.column && rotation == other.rotation);
+    }
 };
 const Command allCommands[22] = {
     Command(2, 0), Command(2, 1), Command(2, 2), Command(2, 3),
@@ -76,7 +81,11 @@ const Command allCommands[22] = {
     Command(4, 0), Command(4, 1), Command(4, 2), Command(4, 3),
     Command(5, 1), Command(5, 2), Command(5, 3),
     Command(0, 0), Command(0, 1), Command(0, 3),
-    Command(1, 0), Command(1, 1), Command(1, 2), Command(1, 3) };
+    Command(1, 0), Command(1, 1), Command(1, 2), Command(1, 3)
+};
+int getCommandIdx(const Command& cmd) {
+    return distance(allCommands, find(allCommands, allCommands + 22, cmd));
+}
 
 class Grid
 {
@@ -84,6 +93,9 @@ protected:
     char grid[NB_LINES][NB_COLUMNS];
 
 public:
+    int score = 0;
+    float skullPoints = 0.0f;
+
     Grid() {
         for (int i = 0; i < NB_LINES; i++)
             for (int j = 0; j < NB_COLUMNS; j++)
@@ -201,6 +213,20 @@ public:
         return std::pair<int, int>(nbBlocks, realNbBlocks);
     }
 
+    void sendSkulls(int nb_skulls) {
+        for (int j = 0; j < NB_COLUMNS; j++) {
+            int column_nb_skulls_rem = nb_skulls;
+            for (int i = NB_LINES - 1; i >= 0; i--) {
+                if (grid[i][j] == EMPTY_CELL) {
+                    grid[i][j] = SKULL_CELL;
+                    --column_nb_skulls_rem;
+                    if (column_nb_skulls_rem <= 0)
+                        break;
+                }
+            }
+        }
+    }
+
 protected:
     void applyGravity(vector<Pos>& outModifiedPositions)
     {
@@ -223,18 +249,18 @@ protected:
             }
         }
     }
-    float update(vector<Pos> positions)
+    float update(vector<Pos>&& positions)
     {
-        //int score = 0;
-        //int CP = 0;
+        int turnScore = 0;
+        int CP = 0;
         int nbCombos = 0;
         bool first = true;
         int adjacencyScore = 0;
         while (true)
         {
             int B = 0;
-            //int nbCouleurs = -1;
-            //int GB = 0;
+            int nbCouleurs = -1;
+            int GB = 0;
             while (!positions.empty())
             {
                 Pos pos = positions.back();
@@ -244,10 +270,10 @@ protected:
                 int nbBlocks = destroyRes.first;
                 int realGroupSize = destroyRes.second;
                 B += nbBlocks;
-                //nbCouleurs++;
+                nbCouleurs++;
 
-                //if (nbBlocks > 4)
-                //    GB += (nbBlocks > 10 ? 8 : (nbBlocks - 4));
+                if (nbBlocks > 4)
+                    GB += (nbBlocks > 10 ? 8 : (nbBlocks - 4));
 
                 if (first)
                     adjacencyScore += realGroupSize;
@@ -256,19 +282,22 @@ protected:
             if (B == 0)
                 break;
 
-            //int CB = (nbCouleurs == 0 ? 0 : (1 << (nbCouleurs - 1)));
-            //int sumC = min(max(CP + CB + GB, 1), 999);
-            //score += (10 * B) * sumC;
+            int CB = (nbCouleurs == 0 ? 0 : (1 << (nbCouleurs - 1)));
+            int sumC = min(max(CP + CB + GB, 1), 999);
+            turnScore += (10 * B) * sumC;
             nbCombos++;
 
-            //if (CP == 0)
-            //    CP = 8;
-            //else
-            //    CP *= 2;
+            if (CP == 0)
+                CP = 8;
+            else
+                CP *= 2;
 
             applyGravity(positions);
         }
-        return float(1 << max(2 * nbCombos - 1, 1)) + adjacencyScore * 0.1f;
+        score += turnScore;
+        skullPoints += turnScore / 70.0f;
+        //return float(1 << max(2 * nbCombos - 1, 1)) + adjacencyScore * 0.1f;
+        return pow(2.0f, nbCombos);
     }
 
     vector<Pos> applyVerticalPositions(const Block& block, int column)
@@ -336,9 +365,26 @@ public:
     Grid oppGrid;
     vector<Block> nextBlocks;
 
+protected:
+    static void sendSkulls(Grid& sourceGrid, Grid& distGrid) {
+        int sourceSkullLines = int(sourceGrid.skullPoints / 6.0f);
+        if (sourceSkullLines > 0) {
+            sourceGrid.skullPoints -= sourceSkullLines * 6.0f;
+            distGrid.sendSkulls(sourceSkullLines);
+        }
+    }
+
+public:
     GameState() {
         for (int i = 0; i < NB_BLOCKS_KNOWN; i++)
             nextBlocks.emplace_back(rand() % NB_COLORS, rand() % NB_COLORS);
+    }
+
+    GameState reversed() const {
+        GameState ret(*this);
+        ret.myGrid = oppGrid;
+        ret.oppGrid = myGrid;
+        return ret;
     }
 
     array<float, NB_BLOCKS_KNOWN> estimateMultCoeff() const
@@ -362,18 +408,20 @@ public:
 
     float applyMyCommand(Command cmd)
     {
-        float score = myGrid.applyCommand(nextBlocks.back(), cmd);
+        float reward = myGrid.applyCommand(nextBlocks.back(), cmd);
         nextBlocks.pop_back();
-        return score;
+        return reward;
     }
 
     std::pair<float, float> play(Command myCmd, Command oppCmd) {
-        float myScore = myGrid.applyCommand(nextBlocks.back(), myCmd);
-        float oppScore = oppGrid.applyCommand(nextBlocks.back(), oppCmd);
+        float myReward = myGrid.applyCommand(nextBlocks.back(), myCmd);
+        float oppReward = oppGrid.applyCommand(nextBlocks.back(), oppCmd);
+        sendSkulls(myGrid, oppGrid);
+        sendSkulls(oppGrid, myGrid);
         for (int i = nextBlocks.size() - 1; i >= 0; i--)
             nextBlocks[i + 1] = nextBlocks[i];
         nextBlocks[0] = Block(rand() % NB_COLORS, rand() % NB_COLORS);
-        return std::pair<float, float>(myScore, oppScore);
+        return std::pair<float, float>(myReward, oppReward);
     }
 };
 

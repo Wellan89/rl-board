@@ -3,6 +3,7 @@ import random
 import gym
 import numpy as np
 
+import stc_agent
 from cpp import stc_pybind
 from envs import opp_env
 from envs.stc import renderer
@@ -11,10 +12,10 @@ stc_pybind.srand(random.SystemRandom().getrandbits(32))
 
 
 class StcEnv(opp_env.OppEnv):
-    genetic_opponent_simulations = -1
+    opponent_simulations = -1
 
     def __init__(self):
-        super().__init__()
+        super().__init__(model_class=stc_agent.Model)
         self.world = None
 
         self.reset()
@@ -32,7 +33,7 @@ class StcEnv(opp_env.OppEnv):
 
     def step(self, action):
         opp_solution = self._compute_opp_solution(
-            dummy_opp_solution_func=lambda: self.world.dummy_opp_solution(self.genetic_opponent_simulations)
+            dummy_opp_solution_func=lambda: self.world.dummy_opp_solution(self.opponent_simulations)
         )
 
         easy_reward = self.world.play(action, opp_solution)
@@ -64,6 +65,16 @@ class StcEnvD0(StcEnv):
 
 
 class StcEnvD1(StcEnv):
+    def __init__(self):
+        super().__init__()
+        self.set_hard_env_weight(weight=1.0)
+
+
+class StcEnvD2(StcEnv):
+    opponent_simulations = 1000
+
+
+class StcEnvD3(StcEnvD2):
     def __init__(self):
         super().__init__()
         self.set_hard_env_weight(weight=1.0)

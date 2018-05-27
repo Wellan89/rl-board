@@ -7,7 +7,6 @@ from scipy import stats
 from tensorforce.contrib.openai_gym import OpenAIGym
 
 import checkpoints_utils
-import csb_agent
 import envs
 from train import OpponentPredictor
 
@@ -19,8 +18,11 @@ def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
             monitor=monitor if episode_id == 0 else None,
             monitor_video=1 if episode_id == 0 else 0
         )
+        model = environment.model_class(**model)
         if versus_model:
-            environment.gym.unwrapped.set_opponent_factory(lambda: OpponentPredictor(model=versus_model))
+            environment.gym.unwrapped.set_opponent_factory(
+                lambda: OpponentPredictor(model=environment.model_class(**versus_model))
+            )
         state = environment.reset()
         reward = 0.0
         while True:
@@ -46,9 +48,10 @@ class _MappedGenerateEpisodeData:
 def _compute_rewards(gym_id, model_path, episodes, monitor, processes,
                      deterministic, versus_model_path, versus_deterministic):
     with multiprocessing.Pool(processes=processes) as p:
-        model = csb_agent.Model(checkpoints_utils.read_weights(model_path), deterministic=deterministic)
+        model = {'weights': checkpoints_utils.read_weights(model_path), 'deterministic': deterministic}
         if versus_model_path:
-            versus_model = csb_agent.Model(checkpoints_utils.read_weights(versus_model_path), deterministic=versus_deterministic)
+            versus_model = {'weights': checkpoints_utils.read_weights(versus_model_path),
+                            'deterministic':  versus_deterministic}
         else:
             versus_model = None
         return p.map(_MappedGenerateEpisodeData(gym_id=gym_id, model=model, versus_model=versus_model, monitor=monitor),

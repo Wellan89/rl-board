@@ -3,6 +3,7 @@ import random
 import gym
 import numpy as np
 
+import csb_agent
 from cpp import csb_pybind
 from envs import opp_env
 from envs.csb import renderer
@@ -11,10 +12,10 @@ csb_pybind.srand(random.SystemRandom().getrandbits(32))
 
 
 class CsbEnv(opp_env.OppEnv):
-    genetic_opponent_simulations = -1
+    opponent_simulations = -1
 
     def __init__(self):
-        super().__init__()
+        super().__init__(model_class=csb_agent.Model)
         self.world = None
 
         self.reset()
@@ -45,7 +46,7 @@ class CsbEnv(opp_env.OppEnv):
         action = np.clip(action, 0.0, 1.0)
 
         opp_solution = self._compute_opp_solution(
-            dummy_opp_solution_func=lambda: self.world.dummy_opp_solution(self.genetic_opponent_simulations)
+            dummy_opp_solution_func=lambda: self.world.dummy_opp_solution(self.opponent_simulations)
         )
 
         last_score = self.compute_dense_score()
@@ -108,7 +109,7 @@ class CsbEnvD1(CsbEnv):
 
 
 class CsbEnvD2(CsbEnv):
-    genetic_opponent_simulations = 1000
+    opponent_simulations = 1000
 
 
 class CsbEnvD3(CsbEnvD2):
