@@ -18,10 +18,11 @@ def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
             monitor=monitor if episode_id == 0 else None,
             monitor_video=1 if episode_id == 0 else 0
         )
-        model = environment.model_class(**model)
+        unwrapped_gym = environment.gym.unwrapped
+        model = unwrapped_gym.model_class(**model)
         if versus_model:
-            environment.gym.unwrapped.set_opponent_factory(
-                lambda: OpponentPredictor(model=environment.model_class(**versus_model))
+            unwrapped_gym.set_opponent_factory(
+                lambda: OpponentPredictor(model=unwrapped_gym.model_class(**versus_model))
             )
         state = environment.reset()
         reward = 0.0

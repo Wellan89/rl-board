@@ -15,6 +15,7 @@ from baselines.ppo1 import pposgd_simple, mlp_policy
 
 import envs
 import checkpoints_utils
+from envs.stc import stc_policy
 
 
 def _load_vars_dict(local_vars):
@@ -179,7 +180,8 @@ class VideoMonitorCallback:
 
 
 def policy_fn(name, ob_space, ac_space):
-    return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=96, num_hid_layers=2)
+    # return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=96, num_hid_layers=2)
+    return stc_policy.StcPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
 
 
 def main():
@@ -210,9 +212,9 @@ def main():
 
     callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=300, linear_schedule=True),
-        VersusCallback(env=env, start_iterations=20, threshold_iterations=20, default_ai_weight=2,
-                       latest_models_proportion=0.5, load_first_model=False),
+        HardEnvCallback(env=env, switch_iterations=10000, linear_schedule=True),
+        # VersusCallback(env=env, start_iterations=20, threshold_iterations=20, default_ai_weight=2,
+        #                latest_models_proportion=0.5, load_first_model=False),
     ]
     if rank == 0:
         callbacks += [

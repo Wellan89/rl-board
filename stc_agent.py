@@ -81,7 +81,7 @@ class Action:
         self.action = action
 
     def output(self):
-        print(self.outputs[self.action])
+        print(self.outputs[self.action] + (' {}'.format(msg) if msg else ''))
 
 
 colors_mapping = {

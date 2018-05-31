@@ -21,7 +21,6 @@ class StcEnv(opp_env.OppEnv):
         self.reset()
 
         self.action_space = gym.spaces.Discrete(n=22)
-        #self.observation_space = gym.spaces.MultiDiscrete(nvec=[7] * (8 * 2) + [7] * (12 * 6 * 2))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=[8 * 2 + 12 * 6 * 2], dtype=np.float32)
 
     def _reset(self):
@@ -36,7 +35,7 @@ class StcEnv(opp_env.OppEnv):
             dummy_opp_solution_func=lambda: self.world.dummy_opp_solution(self.opponent_simulations)
         )
 
-        easy_reward = self.world.play(action, opp_solution)
+        easy_reward = self.world.play(action, opp_solution) * 0.001
         self.timesteps += 1
 
         players_won = [self.world.player_won(i) for i in range(2)]
@@ -53,7 +52,7 @@ class StcEnv(opp_env.OppEnv):
             episode_over = False
             raw_reward = 0.0
 
-        reward = (1.0 - self.hard_env_weight) * easy_reward + self.hard_env_weight * raw_reward
+        reward = (1.0 - self.hard_env_weight) * easy_reward + raw_reward
         return self._get_state(), reward, episode_over, {}
 
     def _render(self, viewer, mode):
@@ -71,7 +70,7 @@ class StcEnvD1(StcEnv):
 
 
 class StcEnvD2(StcEnv):
-    opponent_simulations = 1000
+    opponent_simulations = 300
 
 
 class StcEnvD3(StcEnvD2):

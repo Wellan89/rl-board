@@ -111,18 +111,18 @@ public:
         return grid[p.i][p.j];
     }
 
-    float applyCommand(const Block& block, const Command& cmd)
+    float applyCommand(const Block& block, const Command& cmd, bool bruteforceReward)
     {
         switch (cmd.rotation)
         {
         case 0:
-            return applyHorizontal(block, cmd.column);
+            return applyHorizontal(block, cmd.column, bruteforceReward);
         case 1:
-            return applyVertical(block, cmd.column);
+            return applyVertical(block, cmd.column, bruteforceReward);
         case 2:
-            return applyHorizontal(Block(block.colorB, block.colorA), cmd.column - 1);
+            return applyHorizontal(Block(block.colorB, block.colorA), cmd.column - 1, bruteforceReward);
         default: //case 3:
-            return applyVertical(Block(block.colorB, block.colorA), cmd.column);
+            return applyVertical(Block(block.colorB, block.colorA), cmd.column, bruteforceReward);
         }
     }
 
@@ -232,24 +232,23 @@ protected:
     {
         for (int j = 0; j < NB_COLUMNS; j++)
         {
-            int nbFullCells = 0;
+            int firstEmptyCell = NB_LINES - 1;
             for (int i = NB_LINES - 1; i >= 0; i--)
             {
-                int oppNbFullCells = NB_LINES - 1 - nbFullCells;
                 if (grid[i][j] != EMPTY_CELL)
                 {
-                    if (oppNbFullCells != i)
+                    if (firstEmptyCell != i)
                     {
-                        grid[oppNbFullCells][j] = grid[i][j];
+                        grid[firstEmptyCell][j] = grid[i][j];
                         grid[i][j] = EMPTY_CELL;
-                        outModifiedPositions.emplace_back(oppNbFullCells, j);
+                        outModifiedPositions.emplace_back(firstEmptyCell, j);
                     }
-                    nbFullCells++;
+                    firstEmptyCell--;
                 }
             }
         }
     }
-    float update(vector<Pos>&& positions)
+    float update(vector<Pos>&& positions, bool bruteforceReward)
     {
         int turnScore = 0;
         int CP = 0;
@@ -269,11 +268,12 @@ protected:
                 std::pair<int, int> destroyRes = detectAndDestroyGroup(pos, positions);
                 int nbBlocks = destroyRes.first;
                 int realGroupSize = destroyRes.second;
-                B += nbBlocks;
-                nbCouleurs++;
-
-                if (nbBlocks > 4)
+                if (nbBlocks >= 4)
+                {
+                    B += nbBlocks;
+                    nbCouleurs++;
                     GB += (nbBlocks > 10 ? 8 : (nbBlocks - 4));
+                }
 
                 if (first)
                     adjacencyScore += realGroupSize;
@@ -282,7 +282,7 @@ protected:
             if (B == 0)
                 break;
 
-            int CB = (nbCouleurs == 0 ? 0 : (1 << (nbCouleurs - 1)));
+            int CB = (nbCouleurs <= 0 ? 0 : (1 << (nbCouleurs - 1)));
             int sumC = min(max(CP + CB + GB, 1), 999);
             turnScore += (10 * B) * sumC;
             nbCombos++;
@@ -296,8 +296,13 @@ protected:
         }
         score += turnScore;
         skullPoints += turnScore / 70.0f;
-        //return float(1 << max(2 * nbCombos - 1, 1)) + adjacencyScore * 0.1f;
-        return pow(2.0f, nbCombos);
+
+        if (bruteforceReward) {
+            return float(1 << max(2 * nbCombos - 1, 1)) + adjacencyScore * 0.1f;
+        } else {
+            //return (nbCombos > 0 ? pow(4, nbCombos - 1) * 0.1f : 0.0f);
+            return turnScore;
+        }
     }
 
     vector<Pos> applyVerticalPositions(const Block& block, int column)
@@ -339,13 +344,13 @@ protected:
         }
         return positions;
     }
-    float applyVertical(const Block& block, int column)
+    float applyVertical(const Block& block, int column, bool bruteforceReward)
     {
-        return update(applyVerticalPositions(block, column));
+        return update(applyVerticalPositions(block, column), bruteforceReward);
     }
-    float applyHorizontal(const Block& block, int column)
+    float applyHorizontal(const Block& block, int column, bool bruteforceReward)
     {
-        return update(applyHorizontalPositions(block, column));
+        return update(applyHorizontalPositions(block, column), bruteforceReward);
     }
 
     bool canPoseBlockVertical(int column) const
@@ -408,14 +413,14 @@ public:
 
     float applyMyCommand(Command cmd)
     {
-        float reward = myGrid.applyCommand(nextBlocks.back(), cmd);
+        float reward = myGrid.applyCommand(nextBlocks.back(), cmd, true);
         nextBlocks.pop_back();
         return reward;
     }
 
     std::pair<float, float> play(Command myCmd, Command oppCmd) {
-        float myReward = myGrid.applyCommand(nextBlocks.back(), myCmd);
-        float oppReward = oppGrid.applyCommand(nextBlocks.back(), oppCmd);
+        float myReward = myGrid.applyCommand(nextBlocks.back(), myCmd, false);
+        float oppReward = oppGrid.applyCommand(nextBlocks.back(), oppCmd, false);
         sendSkulls(myGrid, oppGrid);
         sendSkulls(oppGrid, myGrid);
         for (int i = nextBlocks.size() - 1; i >= 0; i--)
