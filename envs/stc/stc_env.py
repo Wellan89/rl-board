@@ -41,13 +41,13 @@ class StcEnv(opp_env.OppEnv):
         players_won = [self.world.player_won(i) for i in range(2)]
         if players_won[0] and players_won[1]:
             episode_over = True
-            raw_reward = 0.0
+            raw_reward = 10.0
         elif players_won[1]:
             episode_over = True
-            raw_reward = -10.0
+            raw_reward = 0.0
         elif players_won[0]:
             episode_over = True
-            raw_reward = 10.0
+            raw_reward = 20.0
         else:
             episode_over = False
             raw_reward = 0.0

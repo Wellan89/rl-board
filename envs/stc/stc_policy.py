@@ -7,8 +7,8 @@ from baselines.common.distributions import make_pdtype
 def _grid_cnn(x):
     x = tf.reshape(x, shape=[-1, 12, 6])
     x = tf.one_hot(x, depth=7)
-    x = tf.nn.tanh(U.conv2d(x, 12, 'l1', [3, 3], [1, 1], pad='VALID'))
-    x = tf.nn.tanh(U.conv2d(x, 12, 'l2', [3, 3], [1, 1], pad='VALID'))
+    x = tf.nn.leaky_relu(U.conv2d(x, 12, 'l1', [3, 3], [1, 1], pad='VALID'), alpha=0.1)
+    x = tf.nn.leaky_relu(U.conv2d(x, 12, 'l2', [3, 3], [1, 1], pad='VALID'), alpha=0.1)
     x = U.flattenallbut0(x)
     return x
 
@@ -30,8 +30,8 @@ class StcPolicy(object):
         with tf.variable_scope('next_blocks'):
             next_blocks = tf.one_hot(next_blocks, depth=5)
             next_blocks = U.flattenallbut0(next_blocks)
-            next_blocks = tf.nn.tanh(tf.layers.dense(next_blocks, 12, name='l1', kernel_initializer=U.normc_initializer(1.0)))
-            next_blocks = tf.nn.tanh(tf.layers.dense(next_blocks, 12, name='l2', kernel_initializer=U.normc_initializer(1.0)))
+            next_blocks = tf.nn.leaky_relu(tf.layers.dense(next_blocks, 12, name='l1', kernel_initializer=U.normc_initializer(1.0)), alpha=0.1)
+            next_blocks = tf.nn.leaky_relu(tf.layers.dense(next_blocks, 12, name='l2', kernel_initializer=U.normc_initializer(1.0)), alpha=0.1)
 
         with tf.variable_scope('grids', reuse=False):
             my_grid = _grid_cnn(my_grid)
@@ -40,7 +40,7 @@ class StcPolicy(object):
             opp_grid = _grid_cnn(opp_grid)
 
         x = tf.concat([next_blocks, my_grid, opp_grid], axis=1)
-        x = tf.nn.tanh(tf.layers.dense(x, 64, name='lin', kernel_initializer=U.normc_initializer(1.0)))
+        x = tf.nn.leaky_relu(tf.layers.dense(x, 64, name='lin', kernel_initializer=U.normc_initializer(1.0)), alpha=0.1)
 
         logits = tf.layers.dense(x, pdtype.param_shape()[0], name='logits', kernel_initializer=U.normc_initializer(0.01))
         self.pd = pdtype.pdfromflat(logits)
