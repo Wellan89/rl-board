@@ -168,7 +168,7 @@ def main():
 
     callbacks += [
         ReloadCallback(model_path=args.load),
-        HardEnvCallback(env=env, switch_iterations=10000, linear_schedule=True),
+        HardEnvCallback(env=env, switch_iterations=1000, linear_schedule=True),
         # VersusCallback(env=env, start_iterations=20, threshold_iterations=20, default_ai_weight=2,
         #                latest_models_proportion=0.5, load_first_model=False),
     ]
@@ -177,7 +177,7 @@ def main():
             SaveCallback(log_dir=log_dir),
         ]
     pposgd_simple.learn(
-        env, env.policy_class, max_iters=10000,
+        env, env.unwrapped.policy_class, max_iters=1000000,
         timesteps_per_actorbatch=timesteps_per_actorbatch,
         clip_param=0.2, entcoeff=0.0,
         optim_epochs=6, optim_stepsize=1e-3, optim_batchsize=4096,
