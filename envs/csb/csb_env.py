@@ -3,10 +3,10 @@ import random
 import gym
 import numpy as np
 
-import csb_agent
 from cpp import csb_pybind
 from envs import opp_env
 from envs.csb import renderer
+from envs.csb import csb_policy
 
 csb_pybind.srand(random.SystemRandom().getrandbits(32))
 
@@ -15,7 +15,7 @@ class CsbEnv(opp_env.OppEnv):
     opponent_simulations = -1
 
     def __init__(self):
-        super().__init__(model_class=csb_agent.Model)
+        super().__init__(policy_class=csb_policy.CsbPolicy)
         self.world = None
 
         self.reset()

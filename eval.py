@@ -11,7 +11,7 @@ import envs
 from train import OpponentPredictor
 
 
-def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
+def _generate_episode_data(episode_id, gym_id, model_data, versus_model_data, monitor):
     try:
         environment = OpenAIGym(
             gym_id=gym_id,
@@ -19,15 +19,13 @@ def _generate_episode_data(episode_id, gym_id, model, versus_model, monitor):
             monitor_video=1 if episode_id == 0 else 0
         )
         unwrapped_gym = environment.gym.unwrapped
-        model = unwrapped_gym.model_class(**model)
-        if versus_model:
-            unwrapped_gym.set_opponent_factory(
-                lambda: OpponentPredictor(model=unwrapped_gym.model_class(**versus_model))
-            )
+        predictor = OpponentPredictor(env=unwrapped_gym, **model_data)
+        if versus_model_data:
+            unwrapped_gym.set_opponent_factory(lambda: OpponentPredictor(env=unwrapped_gym, **versus_model_data))
         state = environment.reset()
         reward = 0.0
         while True:
-            action = model.predict(state)
+            action = predictor(state)
             state, terminal, step_reward = environment.execute(action)
             reward += step_reward
             if terminal:
@@ -49,13 +47,14 @@ class _MappedGenerateEpisodeData:
 def _compute_rewards(gym_id, model_path, episodes, monitor, processes,
                      deterministic, versus_model_path, versus_deterministic):
     with multiprocessing.Pool(processes=processes) as p:
-        model = {'weights': checkpoints_utils.read_weights(model_path), 'deterministic': deterministic}
+        model_data = {'weights': checkpoints_utils.read_weights(model_path), 'deterministic': deterministic}
         if versus_model_path:
-            versus_model = {'weights': checkpoints_utils.read_weights(versus_model_path),
+            versus_model_data = {'weights': checkpoints_utils.read_weights(versus_model_path),
                             'deterministic':  versus_deterministic}
         else:
-            versus_model = None
-        return p.map(_MappedGenerateEpisodeData(gym_id=gym_id, model=model, versus_model=versus_model, monitor=monitor),
+            versus_model_data = None
+        return p.map(_MappedGenerateEpisodeData(gym_id=gym_id, model_data=model_data,
+                                                versus_model_data=versus_model_data, monitor=monitor),
                      range(episodes))
 
 

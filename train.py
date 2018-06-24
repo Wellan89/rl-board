@@ -15,7 +15,7 @@ from baselines.ppo1 import pposgd_simple, mlp_policy
 
 import envs
 import checkpoints_utils
-from envs.stc import stc_policy
+from envs.opp_env import OpponentPredictor
 
 
 def _load_vars_dict(local_vars):
@@ -35,7 +35,7 @@ class SaveCallback:
     def __call__(self, local_vars, global_vars):
         vars_dict = _load_vars_dict(local_vars)
         self._save(os.path.join(self.log_dir, 'model.npz'), vars_dict)
-        self._save(os.path.join(self.log_dir, 'checkpoints/model_{}.npz'.format(local_vars['iters_so_far'])), vars_dict)
+        self._save(os.path.join(self.log_dir, 'checkpoints/model_{:06}.npz'.format(local_vars['iters_so_far'])), vars_dict)
 
 
 class HardEnvCallback:
@@ -61,18 +61,6 @@ class HardEnvCallback:
         self.env.set_hard_env_weight(hard_env_weight)
 
 
-class OpponentPredictor:
-    def __init__(self, model):
-        self.model = model
-
-    def __call__(self, state):
-        # The None model is the default AI in the environment
-        if self.model:
-            return self.model.predict(state)
-        else:
-            return None
-
-
 class VersusCallback:
     def __init__(self, env, start_iterations, threshold_iterations, default_ai_weight,
                  latest_models_proportion, load_first_model):
@@ -86,7 +74,7 @@ class VersusCallback:
         self.load_first_model = load_first_model
 
         self.n_steps_since_last_update = 0
-        self.models = []
+        self.weights = []
 
     def __call__(self, local_vars, global_vars):
         if local_vars['iters_so_far'] == 0 and self.load_first_model:
@@ -104,19 +92,19 @@ class VersusCallback:
         self.n_steps_since_last_update = 0
 
     def reload(self, local_vars):
-        print('VersusCallback: Loading opponent {}'.format(len(self.models)))
-        self.models.append(self.env.model_class(weights=_load_vars_dict(local_vars)))
+        print('VersusCallback: Loading opponent {}'.format(len(self.weights)))
+        self.weights.append(_load_vars_dict(local_vars))
 
     def make_opponent(self):
-        latest_models = self.models[int(self.latest_models_proportion * len(self.models)):]
-        if self.models and not latest_models:
+        latest_weights = self.weights[int(self.latest_models_proportion * len(self.weights)):]
+        if self.weights and not latest_weights:
             print('VersusCallback: No model selected: using latest model')
-            latest_models = self.models[-1:]
-        latest_models += [None] * self.default_ai_weight  # The None model is the default AI in the environment
-        if not latest_models:
+            latest_weights = self.weights[-1:]
+        latest_weights += [None] * self.default_ai_weight  # The None model is the default AI in the environment
+        if not latest_weights:
             print('VersusCallback: No model avalaible: using default policy')
-            latest_models = [None]
-        return OpponentPredictor(model=random.choice(latest_models))
+            latest_weights = [None]
+        return OpponentPredictor(env=self.env, weights=random.choice(latest_weights))
 
 
 class ReloadCallback:
@@ -150,38 +138,6 @@ class VideoEpisodesMonitorCallback:
         ret = self._should_monitor
         self._should_monitor = False
         return ret
-
-
-class VideoMonitorCallback:
-    def __init__(self, gym_id, log_dir, frequency_iters):
-        self.gym_id = gym_id
-        self.log_dir = log_dir
-        self.frequency_iters = frequency_iters
-
-    def _do_monitor(self, monitor_path, model):
-        print('Recording run to:', monitor_path)
-        env = VideoMonitor(gym.make(self.gym_id), monitor_path, video_callable=lambda _: True)
-        state = env.reset()
-        while True:
-            action = model.predict(state)
-            state, _, terminal, _ = env.step(action)
-            if terminal:
-                break
-        env.close()
-        print('Recorded run to:', monitor_path)
-
-    def __call__(self, local_vars, global_vars):
-        if local_vars['iters_so_far'] % self.frequency_iters != 0:
-            return
-
-        monitor_path = os.path.join(self.log_dir, 'video_monitor/{}'.format(local_vars['iters_so_far']))
-        model = self.env.model_class(weights=_load_vars_dict(local_vars))
-        threading.Thread(target=self._do_monitor, args=(monitor_path, model)).start()
-
-
-def policy_fn(name, ob_space, ac_space):
-    # return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, hid_size=96, num_hid_layers=2)
-    return stc_policy.StcPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
 
 
 def main():
@@ -219,10 +175,9 @@ def main():
     if rank == 0:
         callbacks += [
             SaveCallback(log_dir=log_dir),
-            # VideoMonitorCallback(gym_id=args.gym_id, log_dir=log_dir, frequency_iters=1),
         ]
     pposgd_simple.learn(
-        env, policy_fn, max_iters=10000,
+        env, env.policy_class, max_iters=10000,
         timesteps_per_actorbatch=timesteps_per_actorbatch,
         clip_param=0.2, entcoeff=0.0,
         optim_epochs=6, optim_stepsize=1e-3, optim_batchsize=4096,

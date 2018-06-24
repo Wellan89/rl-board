@@ -33,35 +33,7 @@ class Model:
         return cls(weights=weights)
 
     def predict(self, state):
-        obz = np.asarray(state)
-        state_mean = self.weights['pi/obfilter/runningsum:0'] / self.weights['pi/obfilter/count:0']
-        state_std = np.sqrt(np.maximum(
-            (self.weights['pi/obfilter/runningsumsq:0'] / self.weights['pi/obfilter/count:0']) - np.square(state_mean),
-            1e-2
-        ))
-        obz = np.clip((obz - state_mean) / state_std, -5.0, 5.0)
-        obz = np.asarray(obz, dtype=np.float32)
-
-        action = np.tanh(_matmul(obz, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
-        action = np.tanh(_matmul(action, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
-        action = _matmul(action, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0']
-
-        if IS_CODINGAME:
-            if any('/vf/' in tensor_code for tensor_code in self.weights):
-                vf = np.tanh(_matmul(obz, self.weights['pi/vf/fc1/kernel:0']) + self.weights['pi/vf/fc1/bias:0'])
-                vf = np.tanh(_matmul(vf, self.weights['pi/vf/fc2/kernel:0']) + self.weights['pi/vf/fc2/bias:0'])
-                vf = float(_matmul(vf, self.weights['pi/vf/final/kernel:0']) + self.weights['pi/vf/final/bias:0'])
-            else:
-                vf = 0.0
-            global msg
-            msg = '{:.2f}'.format(vf)
-            print(action, file=sys.stderr)
-            print(msg, file=sys.stderr)
-
-        if not self.deterministic:
-            action -= np.log(-np.log(np.random.uniform(size=action.shape)))
-
-        return np.argmax(action)
+        raise NotImplementedError('Copy me from the policy file')
 
     def compute_action(self, game_state):
         return Action(self.predict(game_state.extract_state()))

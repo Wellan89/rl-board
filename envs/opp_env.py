@@ -11,8 +11,8 @@ class OppEnv(gym.Env):
     reward_range = (-np.inf, np.inf)
     spec = None
 
-    def __init__(self, model_class):
-        self.model_class = model_class
+    def __init__(self, policy_class):
+        self.policy_class = policy_class
         self.timesteps = 0
         self.opponent_predict = None
         self.viewer = None
@@ -71,3 +71,17 @@ class OppEnv(gym.Env):
 
     def set_opponent_factory(self, opponent_factory):
         self.opponent_factory = opponent_factory
+
+
+class OpponentPredictor:
+    def __init__(self, env, weights, deterministic=True):
+        self.policy_class = env.unwrapped.policy_class
+        self.weights = weights
+        self.deterministic = deterministic
+
+    def __call__(self, state):
+        # The None model is the default AI in the environment
+        if self.weights:
+            return self.policy_class.predict_from_weights(state=state, weights=self.weights, deterministic=self.deterministic)
+        else:
+            return None

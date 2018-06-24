@@ -3,10 +3,10 @@ import random
 import gym
 import numpy as np
 
-import stc_agent
 from cpp import stc_pybind
 from envs import opp_env
 from envs.stc import renderer
+from envs.stc import stc_policy
 
 stc_pybind.srand(random.SystemRandom().getrandbits(32))
 
@@ -15,7 +15,7 @@ class StcEnv(opp_env.OppEnv):
     opponent_simulations = -1
 
     def __init__(self):
-        super().__init__(model_class=stc_agent.Model)
+        super().__init__(policy_class=stc_policy.StcPolicy)
         self.world = None
 
         self.reset()

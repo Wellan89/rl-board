@@ -13,10 +13,6 @@ IS_CODINGAME = False
 pod_msgs = ['', '']
 
 
-def _matmul(a, b):
-    return np.einsum('i,ij->j', a, b)
-
-
 class Model:
     def __init__(self, weights, deterministic=True):
         assert weights
@@ -33,32 +29,7 @@ class Model:
         return cls(weights=weights)
 
     def predict(self, state):
-        obz = np.asarray(state)
-        state_mean = self.weights['pi/obfilter/runningsum:0'] / self.weights['pi/obfilter/count:0']
-        state_std = np.sqrt(np.maximum(
-            (self.weights['pi/obfilter/runningsumsq:0'] / self.weights['pi/obfilter/count:0']) - np.square(state_mean),
-            1e-2
-        ))
-        obz = np.clip((obz - state_mean) / state_std, -5.0, 5.0)
-        obz = np.asarray(obz, dtype=np.float32)
-
-        action = np.tanh(_matmul(obz, self.weights['pi/pol/fc1/kernel:0']) + self.weights['pi/pol/fc1/bias:0'])
-        action = np.tanh(_matmul(action, self.weights['pi/pol/fc2/kernel:0']) + self.weights['pi/pol/fc2/bias:0'])
-        action = _matmul(action, self.weights['pi/pol/final/kernel:0']) + self.weights['pi/pol/final/bias:0']
-
-        if IS_CODINGAME:
-            vf = np.tanh(_matmul(obz, self.weights['pi/vf/fc1/kernel:0']) + self.weights['pi/vf/fc1/bias:0'])
-            vf = np.tanh(_matmul(vf, self.weights['pi/vf/fc2/kernel:0']) + self.weights['pi/vf/fc2/bias:0'])
-            vf = float(_matmul(vf, self.weights['pi/vf/final/kernel:0']) + self.weights['pi/vf/final/bias:0'])
-            print(action, file=sys.stderr)
-            print(np.exp(self.weights['pi/pol/logstd:0'][0]), file=sys.stderr)
-            print('{:.2f}'.format(vf), file=sys.stderr)
-            pod_msgs[:] = [' {:.2f}'.format(vf)] * 2
-
-        if not self.deterministic:
-            action = np.random.normal(action, np.exp(self.weights['pi/pol/logstd:0'][0]))
-
-        return np.clip(action, 0.0, 1.0)
+        raise NotImplementedError('Copy me from the policy file')
 
     def compute_action(self, game_state):
         action = self.predict(game_state.extract_state())

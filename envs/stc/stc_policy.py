@@ -1,7 +1,13 @@
+import sys
+
 import baselines.common.tf_util as U
+from baselines.common import distributions
+import numpy as np
 import tensorflow as tf
-import gym
-from baselines.common.distributions import make_pdtype
+
+from envs.nph import nph
+
+IS_CODINGAME = False
 
 
 def _grid_cnn(x):
@@ -15,16 +21,16 @@ def _grid_cnn(x):
 
 class StcPolicy(object):
     recurrent = False
+
     def __init__(self, name, ob_space, ac_space):
         with tf.variable_scope(name):
             self._init(ob_space, ac_space)
             self.scope = tf.get_variable_scope().name
 
     def _init(self, ob_space, ac_space):
-        self.pdtype = pdtype = make_pdtype(ac_space)
-        sequence_length = None
+        self.pdtype = distributions.make_pdtype(ac_space)
 
-        ob = U.get_placeholder(name='ob', dtype=tf.int32, shape=[sequence_length] + list(ob_space.shape))
+        ob = U.get_placeholder(name='ob', dtype=tf.int32, shape=[None] + list(ob_space.shape))
         next_blocks, my_grid, opp_grid = tf.split(ob, [16, 12 * 6, 12 * 6], axis=1)
 
         with tf.variable_scope('next_blocks'):
@@ -42,9 +48,9 @@ class StcPolicy(object):
         x = tf.concat([next_blocks, my_grid, opp_grid], axis=1)
         x = tf.nn.leaky_relu(tf.layers.dense(x, 64, name='lin', kernel_initializer=U.normc_initializer(1.0)), alpha=0.1)
 
-        logits = tf.layers.dense(x, pdtype.param_shape()[0], name='logits', kernel_initializer=U.normc_initializer(0.01))
-        self.pd = pdtype.pdfromflat(logits)
-        self.vpred = tf.layers.dense(x, 1, name='value', kernel_initializer=U.normc_initializer(1.0))[:,0]
+        logits = tf.layers.dense(x, self.pdtype.param_shape()[0], name='logits', kernel_initializer=U.normc_initializer(0.01))
+        self.pd = self.pdtype.pdfromflat(logits)
+        self.vpred = tf.layers.dense(x, 1, name='value', kernel_initializer=U.normc_initializer(1.0))[:, 0]
 
         self.state_in = []
         self.state_out = []
@@ -65,3 +71,44 @@ class StcPolicy(object):
     def get_initial_state(self):
         return []
 
+    @staticmethod
+    def predict_from_weights(state, weights, deterministic=True):
+        ob = np.asarray([state])
+
+        next_blocks, my_grid, opp_grid = np.split(ob, [16, 16 + 12 * 6], axis=1)
+
+        next_blocks = nph.one_hot(next_blocks, depth=5)
+        next_blocks = nph.flatten_all_but_0(next_blocks)
+        next_blocks = nph.leaky_relu(nph.dense(next_blocks, weights, 'pi/next_blocks/l1'), alpha=0.1)
+        next_blocks = nph.leaky_relu(nph.dense(next_blocks, weights, 'pi/next_blocks/l2'), alpha=0.1)
+
+        def _np_grid_cnn(x):
+            x = np.reshape(x, [-1, 12, 6])
+            x = nph.one_hot(x, depth=7)
+            x = nph.leaky_relu(nph.conv2d(x, weights, 'pi/grids/l1', pad='VALID'), alpha=0.1)
+            x = nph.leaky_relu(nph.conv2d(x, weights, 'pi/grids/l2', pad='VALID'), alpha=0.1)
+            x = nph.flatten_all_but_0(x)
+            return x
+
+        my_grid = _np_grid_cnn(my_grid)
+        opp_grid = _np_grid_cnn(opp_grid)
+
+        x = np.concatenate([next_blocks, my_grid, opp_grid], axis=1)
+        x = nph.leaky_relu(nph.dense(x, weights, 'pi/lin'), alpha=0.1)
+
+        logits = nph.dense(x, weights, 'pi/logits')
+
+        if IS_CODINGAME:
+            if any('/value/' in tensor_code for tensor_code in weights):
+                vpred = float(nph.dense(x, weights, 'pi/value'))
+            else:
+                vpred = 0.0
+            global msg
+            msg = '{:.2f}'.format(vpred)
+            print(logits, file=sys.stderr)
+            print(msg, file=sys.stderr)
+
+        if not deterministic:
+            logits -= np.log(-np.log(np.random.uniform(size=logits.shape)))
+
+        return np.argmax(logits)
