@@ -19,7 +19,7 @@ def _grid_cnn(x):
     return x
 
 
-class StcPolicy(object):
+class StcPolicy:
     recurrent = False
 
     def __init__(self, name, ob_space, ac_space):

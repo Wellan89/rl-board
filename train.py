@@ -2,7 +2,6 @@ import argparse
 import datetime
 import os
 import random
-import threading
 
 import gym
 import numpy as np
@@ -11,7 +10,7 @@ from mpi4py import MPI
 from baselines import bench
 from baselines import logger
 from baselines.common import tf_util as U
-from baselines.ppo1 import pposgd_simple, mlp_policy
+from baselines.ppo1 import pposgd_simple
 
 import envs
 import checkpoints_utils
